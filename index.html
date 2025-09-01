@@ -1134,11 +1134,33 @@
             }
 
             getColorForLinearPosition(position, maxPosition) {
+                // Cache color calculations for performance
+                const key = `${position}-${maxPosition}`;
+                if (!this.colorCache) this.colorCache = new Map();
+                
+                if (this.colorCache.has(key)) {
+                    return this.colorCache.get(key);
+                }
+                
                 const hue = 120 - (position / maxPosition) * 120; // Green to red (120° to 0°)
-                return `hsl(${hue}, 70%, 50%)`;
+                const color = `hsl(${hue}, 70%, 50%)`;
+                
+                // Limit cache size to prevent memory leaks
+                if (this.colorCache.size > 10000) {
+                    this.colorCache.clear();
+                }
+                this.colorCache.set(key, color);
+                return color;
             }
 
             handleMouseMove(e, canvasKey) {
+                // Throttle mouse move updates for performance
+                if (this.mouseThrottle) return;
+                this.mouseThrottle = true;
+                requestAnimationFrame(() => {
+                    this.mouseThrottle = false;
+                });
+
                 const canvas = this.canvases[canvasKey];
                 const rect = canvas.getBoundingClientRect();
                 // Scale mouse coordinates to match canvas internal dimensions
@@ -1302,7 +1324,13 @@
                 this.hoveredCell = null;
                 this.hoveredChunk = null;
                 this.tooltip.style.display = 'none';
-                this.update();
+                // Use requestAnimationFrame for smoother updates
+                if (this.updatePending) return;
+                this.updatePending = true;
+                requestAnimationFrame(() => {
+                    this.updatePending = false;
+                    this.update();
+                });
             }
 
             update() {
@@ -1321,6 +1349,7 @@
                     this.positionCache.clear();
                     if (this.chunkPositionCache) this.chunkPositionCache.clear();
                     if (this.cellPositionCache) this.cellPositionCache.clear();
+                    if (this.colorCache) this.colorCache.clear();
                 }
                 this.lastParams = { ...params };
 
@@ -1447,40 +1476,53 @@
                 const offsetY = (canvas.height - sizeY * cellSize) / 2;
 
                 // Draw cells with gradient based on global linearization order
-                for (let y = 0; y < sizeY; y++) {
-                    for (let x = 0; x < sizeX; x++) {
-                        const globalPos = this.getGlobalPosition(x, y, 0, params);
-                        const color = this.getColorForLinearPosition(globalPos, data.totalCells - 1);
+                // Skip rendering individual cells if they're too small to see
+                if (cellSize > 2) {
+                    for (let y = 0; y < sizeY; y++) {
+                        for (let x = 0; x < sizeX; x++) {
+                            const globalPos = this.getGlobalPosition(x, y, 0, params);
+                            const color = this.getColorForLinearPosition(globalPos, data.totalCells - 1);
 
-                        ctx.fillStyle = color;
-                        ctx.fillRect(
-                            offsetX + x * cellSize,
-                            offsetY + y * cellSize,
-                            cellSize - 1,
-                            cellSize - 1
-                        );
-
-                        // Highlight if hovered cell
-                        if (this.hoveredCell && this.hoveredCell.x === x && this.hoveredCell.y === y) {
-                            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                            ctx.fillStyle = color;
                             ctx.fillRect(
                                 offsetX + x * cellSize,
                                 offsetY + y * cellSize,
                                 cellSize - 1,
                                 cellSize - 1
                             );
-                            // Add outline for directly hovered cell
-                            ctx.strokeStyle = '#fff';
-                            ctx.lineWidth = 3;
-                            ctx.strokeRect(
-                                offsetX + x * cellSize,
-                                offsetY + y * cellSize,
-                                cellSize - 1,
-                                cellSize - 1
-                            );
                         }
-
                     }
+                } else {
+                    // For very small cells, draw as a single gradient rectangle
+                    const gradient = ctx.createLinearGradient(offsetX, offsetY, offsetX + sizeX * cellSize, offsetY + sizeY * cellSize);
+                    gradient.addColorStop(0, '#00ff00');
+                    gradient.addColorStop(1, '#ff0000');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(offsetX, offsetY, sizeX * cellSize, sizeY * cellSize);
+                }
+
+                // Handle cell highlighting for visible cells
+                if (cellSize > 2 && this.hoveredCell) {
+                    const x = this.hoveredCell.x;
+                    const y = this.hoveredCell.y;
+                    
+                    // Highlight if hovered cell
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.fillRect(
+                        offsetX + x * cellSize,
+                        offsetY + y * cellSize,
+                        cellSize - 1,
+                        cellSize - 1
+                    );
+                    // Add outline for directly hovered cell
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(
+                        offsetX + x * cellSize,
+                        offsetY + y * cellSize,
+                        cellSize - 1,
+                        cellSize - 1
+                    );
                 }
 
                 // Draw query region outline
@@ -1685,11 +1727,21 @@
                 const offsetX = 20;
                 const offsetY = 20;
 
-                // Draw all cells with gradient
-                for (let i = 0; i < data.totalCells; i++) {
-                    const color = this.getColorForLinearPosition(i, data.totalCells);
-                    ctx.fillStyle = color;
-                    ctx.fillRect(offsetX + i * cellWidth, offsetY, cellWidth, barHeight);
+                // Draw all cells with gradient - use batching for performance
+                if (cellWidth < 1) {
+                    // For very small cells, draw as a single gradient
+                    const gradient = ctx.createLinearGradient(offsetX, offsetY, offsetX + data.totalCells * cellWidth, offsetY);
+                    gradient.addColorStop(0, '#00ff00');
+                    gradient.addColorStop(1, '#ff0000');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(offsetX, offsetY, data.totalCells * cellWidth, barHeight);
+                } else {
+                    // Normal cell-by-cell rendering
+                    for (let i = 0; i < data.totalCells; i++) {
+                        const color = this.getColorForLinearPosition(i, data.totalCells);
+                        ctx.fillStyle = color;
+                        ctx.fillRect(offsetX + i * cellWidth, offsetY, cellWidth, barHeight);
+                    }
                 }
 
                 // Highlight requested cells
