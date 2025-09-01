@@ -484,12 +484,6 @@
                         <label>Scenario Presets</label>
                         <select id="presets">
                             <option value="user">User Settings</option>
-                            <option value="small-tiles">Small Tiles vs Large Query</option>
-                            <option value="large-tiles">Large Tiles vs Small Query</option>
-                            <option value="row-vs-col">Row-Major vs Column-Major</option>
-                            <option value="spatial-locality">Spatial Locality Comparison</option>
-                            <option value="fragmentation">High Fragmentation Scenario</option>
-                            <option value="perfect-alignment">Perfect Chunk Alignment</option>
                         </select>
                     </div>
                     <button class="reset-button" id="resetButton">reset to default</button>
@@ -748,74 +742,86 @@
     </div>
 
     <script>
-        // Shared preset configurations
         const PRESET_CONFIGS = {
             'small-tiles': {
+                name: 'Small Tiles vs Large Query',
                 cellAlgorithm: 'row-major',
                 chunkAlgorithm: 'row-major',
-                sizeX: '32', sizeY: '32', sizeZ: '1',
-                chunkX: '2', chunkY: '2', chunkZ: '1',
-                queryX1: '8', queryX2: '24', queryY1: '8', queryY2: '24',
-                queryZ1: '0', queryZ2: '0'
+                sizeX: 32, sizeY: 32, sizeZ: 1,
+                chunkX: 2, chunkY: 2, chunkZ: 1,
+                queryX1: 8, queryX2: 24, queryY1: 8, queryY2: 24,
+                queryZ1: 0, queryZ2: 0
             },
             'large-tiles': {
+                name: 'Large Tiles vs Small Query',
                 cellAlgorithm: 'row-major',
                 chunkAlgorithm: 'row-major',
-                sizeX: '32', sizeY: '32', sizeZ: '1',
-                chunkX: '16', chunkY: '16', chunkZ: '1',
-                queryX1: '10', queryX2: '14', queryY1: '10', queryY2: '14',
-                queryZ1: '0', queryZ2: '0'
+                sizeX: 32, sizeY: 32, sizeZ: 1,
+                chunkX: 16, chunkY: 16, chunkZ: 1,
+                queryX1: 10, queryX2: 14, queryY1: 10, queryY2: 14,
+                queryZ1: 0, queryZ2: 0
             },
             'row-vs-col': {
+                name: 'Row-Major vs Column-Major',
                 cellAlgorithm: 'col-major',
                 chunkAlgorithm: 'row-major',
-                sizeX: '16', sizeY: '16', sizeZ: '1',
-                chunkX: '4', chunkY: '8', chunkZ: '1',
-                queryX1: '2', queryX2: '6', queryY1: '4', queryY2: '12',
-                queryZ1: '0', queryZ2: '0'
+                sizeX: 16, sizeY: 16, sizeZ: 1,
+                chunkX: 4, chunkY: 8, chunkZ: 1,
+                queryX1: 2, queryX2: 6, queryY1: 4, queryY2: 12,
+                queryZ1: 0, queryZ2: 0
             },
             'spatial-locality': {
+                name: 'Spatial Locality Comparison',
                 cellAlgorithm: 'hilbert',
                 chunkAlgorithm: 'hilbert',
-                sizeX: '16', sizeY: '16', sizeZ: '1',
-                chunkX: '4', chunkY: '4', chunkZ: '1',
-                queryX1: '6', queryX2: '9', queryY1: '6', queryY2: '9',
-                queryZ1: '0', queryZ2: '0'
+                sizeX: 16, sizeY: 16, sizeZ: 1,
+                chunkX: 4, chunkY: 4, chunkZ: 1,
+                queryX1: 6, queryX2: 9, queryY1: 6, queryY2: 9,
+                queryZ1: 0, queryZ2: 0
             },
             'fragmentation': {
+                name: 'High Fragmentation Scenario',
                 cellAlgorithm: 'z-order',
                 chunkAlgorithm: 'col-major',
-                sizeX: '20', sizeY: '20', sizeZ: '1',
-                chunkX: '3', chunkY: '3', chunkZ: '1',
-                queryX1: '1', queryX2: '18', queryY1: '5', queryY2: '7',
-                queryZ1: '0', queryZ2: '0'
+                sizeX: 20, sizeY: 20, sizeZ: 1,
+                chunkX: 3, chunkY: 3, chunkZ: 1,
+                queryX1: 1, queryX2: 18, queryY1: 5, queryY2: 7,
+                queryZ1: 0, queryZ2: 0
             },
             'perfect-alignment': {
+                name: 'Perfect Chunk Alignment',
                 cellAlgorithm: 'row-major',
                 chunkAlgorithm: 'row-major',
-                sizeX: '16', sizeY: '16', sizeZ: '1',
-                chunkX: '4', chunkY: '4', chunkZ: '1',
-                queryX1: '4', queryX2: '7', queryY1: '4', queryY2: '7',
-                queryZ1: '0', queryZ2: '0'
+                sizeX: 16, sizeY: 16, sizeZ: 1,
+                chunkX: 4, chunkY: 4, chunkZ: 1,
+                queryX1: 4, queryX2: 7, queryY1: 4, queryY2: 7,
+                queryZ1: 0, queryZ2: 0
             }
         };
 
-        // Default user settings
         const DEFAULT_USER_SETTINGS = {
             cellAlgorithm: 'row-major',
             chunkAlgorithm: 'row-major',
-            sizeX: '16',
-            sizeY: '16',
-            sizeZ: '1',
-            chunkX: '4',
-            chunkY: '4',
-            chunkZ: '1',
-            queryX1: '3',
-            queryX2: '10',
-            queryY1: '3',
-            queryY2: '10',
-            queryZ1: '0',
-            queryZ2: '0'
+            sizeX: 16,
+            sizeY: 16,
+            sizeZ: 1,
+            chunkX: 4,
+            chunkY: 4,
+            chunkZ: 1,
+            queryX1: 3,
+            queryX2: 10,
+            queryY1: 3,
+            queryY2: 10,
+            queryZ1: 0,
+            queryZ2: 0
+        };
+
+        const DEFAULT_APP_STATE = {
+            currentPreset: 'user',
+            presets: {
+                user: DEFAULT_USER_SETTINGS
+                // Other preset states get copied here as user modifies them
+            }
         };
 
         class DataVisualizer {
@@ -825,15 +831,93 @@
                 this.linearizationCache = new Map();
                 this.positionCache = new Map();
                 this.lastCanvasSize = new Map();
-                this.userSettings = null;
-                this.isLoadingPreset = false;
+                
+                // Initialize app state after loading from localStorage
                 this.loadSettings();
                 this.initializeControls();
                 this.initializeCanvases();
+                this.renderUI();
                 this.update();
             }
 
+            setState(newState) {
+                const oldState = { ...this.state };
+                this.state = { ...this.state, ...newState };
+                
+                // Clear caches if structural changes occurred
+                const structuralChanges = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ'];
+                const hasStructuralChanges = structuralChanges.some(key => 
+                    key in newState && oldState[key] !== newState[key]
+                );
+                
+                if (hasStructuralChanges) {
+                    this.clearCaches();
+                }
+            }
+            
+            // Full UI update cycle - call this after setState() when you want to update the display
+            updateUI() {
+                this.renderUI();
+                this.updateDOMConstraints();
+                this.updateResetButton();
+                this.updatePresetDisplay();
+                this.update();
+            }
+            
+            // Update HTML form constraints based on current state (no state changes)
+            updateDOMConstraints() {
+                const { sizeX, sizeY, sizeZ } = this.state;
+                
+                document.getElementById('chunkX').max = sizeX;
+                document.getElementById('chunkY').max = sizeY;
+                document.getElementById('chunkZ').max = Math.max(1, sizeZ);
+
+                document.getElementById('queryX1').max = Math.max(0, sizeX - 1);
+                document.getElementById('queryX2').max = Math.max(0, sizeX - 1);
+                document.getElementById('queryY1').max = Math.max(0, sizeY - 1);
+                document.getElementById('queryY2').max = Math.max(0, sizeY - 1);
+                document.getElementById('queryZ1').max = Math.max(0, sizeZ - 1);
+                document.getElementById('queryZ2').max = Math.max(0, sizeZ - 1);
+            }
+            
+            // Sync UI elements to match current state
+            renderUI() {
+                Object.keys(this.state).forEach(key => {
+                    if (key === 'currentPreset') {
+                        const presetsEl = document.getElementById('presets');
+                        if (presetsEl) presetsEl.value = this.state[key];
+                    } else {
+                        const element = document.getElementById(key);
+                        if (element) element.value = this.state[key];
+                    }
+                });
+            }
+            
+            // Clear all caches when structural changes occur
+            clearCaches() {
+                this.linearizationCache.clear();
+                this.positionCache.clear();
+                if (this.chunkPositionCache) this.chunkPositionCache.clear();
+                if (this.cellPositionCache) this.cellPositionCache.clear();
+                if (this.colorCache) this.colorCache.clear();
+            }
+
+            populatePresetOptions() {
+                const presetsSelect = document.getElementById('presets');
+                
+                // Add preset options dynamically
+                Object.keys(PRESET_CONFIGS).forEach(presetKey => {
+                    const option = document.createElement('option');
+                    option.value = presetKey;
+                    option.textContent = this.getPresetDisplayName(presetKey, true);
+                    presetsSelect.appendChild(option);
+                });
+            }
+
             initializeControls() {
+                // Populate preset options
+                this.populatePresetOptions();
+                
                 const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ',
                                  'chunkX', 'chunkY', 'chunkZ',
                                  'queryX1', 'queryX2', 'queryY1', 'queryY2',
@@ -841,23 +925,28 @@
 
                 controls.forEach(id => {
                     const element = document.getElementById(id);
-                    element.addEventListener('change', () => {
-                        if (!this.isLoadingPreset) {
-                            // Only save settings if in user mode
-                            if (document.getElementById('presets').value === 'user') {
-                                this.userSettings = this.getCurrentSettings();
-                                this.saveSettings();
-                            }
+                    element.addEventListener('change', (e) => {
+                        let value = e.target.type === 'number' ? 
+                            parseInt(e.target.value) || 0 : 
+                            e.target.value;
+                            
+                        // Basic validation - more complex validation can be added here
+                        if (e.target.type === 'number') {
+                            value = Math.max(0, value); // No negative values
+                            if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
+                            if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
                         }
-                        this.updateConstraints();
-                        this.updateResetButton();
-                        this.update();
+                        
+                        this.setState({ [id]: value });
+                        this.updateUI();
+                        this.saveSettings(); // Explicit save for user input
                     });
                 });
 
                 // Add preset handler
                 document.getElementById('presets').addEventListener('change', (e) => {
                     this.loadPreset(e.target.value);
+                    this.saveSettings(); // Save when user explicitly changes preset
                 });
 
                 // Add reset button handler
@@ -870,216 +959,225 @@
             }
 
             saveSettings() {
-                const settings = {
-                    cellAlgorithm: document.getElementById('cellAlgorithm').value,
-                    chunkAlgorithm: document.getElementById('chunkAlgorithm').value,
-                    sizeX: document.getElementById('sizeX').value,
-                    sizeY: document.getElementById('sizeY').value,
-                    sizeZ: document.getElementById('sizeZ').value,
-                    chunkX: document.getElementById('chunkX').value,
-                    chunkY: document.getElementById('chunkY').value,
-                    chunkZ: document.getElementById('chunkZ').value,
-                    queryX1: document.getElementById('queryX1').value,
-                    queryX2: document.getElementById('queryX2').value,
-                    queryY1: document.getElementById('queryY1').value,
-                    queryY2: document.getElementById('queryY2').value,
-                    queryZ1: document.getElementById('queryZ1').value,
-                    queryZ2: document.getElementById('queryZ2').value
-                };
-                localStorage.setItem('vischunk-settings', JSON.stringify(settings));
+                // Save current preset settings (excluding currentPreset from the preset data)
+                const currentSettings = { ...this.state };
+                delete currentSettings.currentPreset;
+                
+                // Only save preset if it differs from canonical version
+                const canonicalSettings = this.getCanonicalPreset(this.state.currentPreset);
+                const hasChanges = canonicalSettings && Object.keys(canonicalSettings).some(key => 
+                    currentSettings[key] !== canonicalSettings[key]
+                );
+                
+                if (hasChanges) {
+                    // Preset is modified - save it
+                    this.appState.presets[this.state.currentPreset] = currentSettings;
+                } else {
+                    // Preset matches canonical - remove any saved version
+                    delete this.appState.presets[this.state.currentPreset];
+                }
+                
+                // Always save the current preset selection
+                this.appState.currentPreset = this.state.currentPreset;
+                
+                // Save entire app state
+                localStorage.setItem('vischunk-app-state', JSON.stringify(this.appState));
             }
 
             loadSettings() {
                 try {
-                    const saved = localStorage.getItem('vischunk-settings');
+                    const saved = localStorage.getItem('vischunk-app-state');
                     if (saved) {
-                        const settings = JSON.parse(saved);
-
-                        // Apply settings to controls
-                        Object.keys(settings).forEach(key => {
-                            const element = document.getElementById(key);
-                            if (element) {
-                                element.value = settings[key];
-                            }
-                        });
+                        this.appState = JSON.parse(saved);
+                    } else {
+                        this.appState = DEFAULT_APP_STATE;
                     }
                 } catch (error) {
                     console.warn('Failed to load settings from localStorage:', error);
+                    this.appState = DEFAULT_APP_STATE;
                 }
+                
+                // Initialize current visualization state from the selected preset
+                const currentPreset = this.appState.currentPreset;
+                const presetSettings = this.appState.presets[currentPreset] || 
+                                     this.getCanonicalPreset(currentPreset);
+                
+                this.state = {
+                    ...presetSettings,
+                    currentPreset: currentPreset
+                };
             }
 
             resetSettings() {
-                const currentPreset = document.getElementById('presets').value;
+                const presetName = this.state.currentPreset;
                 
-                if (currentPreset === 'user') {
-                    // Reset to user defaults
-                    this.applySettings(DEFAULT_USER_SETTINGS);
-                    this.userSettings = { ...DEFAULT_USER_SETTINGS };
-                    this.saveSettings();
-                } else {
-                    // Reset to original preset
-                    this.loadPreset(currentPreset);
+                // Remove user modifications for this preset
+                if (this.appState.presets[presetName]) {
+                    delete this.appState.presets[presetName];
                 }
                 
-                this.updateResetButton();
+                // Load canonical preset
+                const canonicalSettings = this.getCanonicalPreset(presetName);
+                if (canonicalSettings) {
+                    this.setState({ ...canonicalSettings, currentPreset: presetName });
+                    this.updateUI();
+                }
+                
+                // Save the reset (removal of modifications)
+                this.saveSettings();
             }
             
             updateResetButton() {
-                const currentPreset = document.getElementById('presets').value;
                 const resetButton = document.getElementById('resetButton');
-                const currentSettings = this.getCurrentSettings();
-                let defaults;
+                const canonical = this.getCanonicalPreset(this.state.currentPreset);
                 
-                if (currentPreset === 'user') {
-                    defaults = DEFAULT_USER_SETTINGS;
-                } else {
-                    defaults = PRESET_CONFIGS[currentPreset];
-                }
-                
-                // Enable/disable button based on whether settings match defaults
-                const isChanged = defaults && Object.keys(defaults).some(key => 
-                    currentSettings[key] !== defaults[key]
+                // Check if current state differs from canonical preset
+                const isChanged = canonical && Object.keys(canonical).some(key => 
+                    this.state[key] !== canonical[key]
                 );
                 
                 resetButton.disabled = !isChanged;
                 resetButton.style.opacity = isChanged ? '1' : '0.5';
             }
-
-
-            getCurrentSettings() {
-                return {
-                    cellAlgorithm: document.getElementById('cellAlgorithm').value,
-                    chunkAlgorithm: document.getElementById('chunkAlgorithm').value,
-                    sizeX: document.getElementById('sizeX').value,
-                    sizeY: document.getElementById('sizeY').value,
-                    sizeZ: document.getElementById('sizeZ').value,
-                    chunkX: document.getElementById('chunkX').value,
-                    chunkY: document.getElementById('chunkY').value,
-                    chunkZ: document.getElementById('chunkZ').value,
-                    queryX1: document.getElementById('queryX1').value,
-                    queryX2: document.getElementById('queryX2').value,
-                    queryY1: document.getElementById('queryY1').value,
-                    queryY2: document.getElementById('queryY2').value,
-                    queryZ1: document.getElementById('queryZ1').value,
-                    queryZ2: document.getElementById('queryZ2').value
-                };
+            
+            // Get canonical preset settings (without user modifications)
+            getCanonicalPreset(presetName) {
+                if (presetName === 'user') {
+                    return DEFAULT_USER_SETTINGS;
+                } else if (PRESET_CONFIGS[presetName]) {
+                    const { name, ...settings } = PRESET_CONFIGS[presetName];
+                    return settings;
+                }
+                return null;
+            }
+            
+            // Get current preset settings (with user modifications if they exist)
+            getCurrentPresetSettings(presetName) {
+                return this.appState.presets[presetName] || this.getCanonicalPreset(presetName);
+            }
+            
+            // Get display name for a preset
+            getPresetDisplayName(presetName, includeModificationIndicator = false) {
+                let baseName = presetName === 'user' ? 'User Settings' : 
+                              PRESET_CONFIGS[presetName]?.name || presetName;
+                              
+                if (includeModificationIndicator && this.isPresetModified(presetName)) {
+                    baseName += ' *';
+                }
+                
+                return baseName;
             }
 
-            applySettings(settings) {
-                this.isLoadingPreset = true;
+            isPresetModified(presetName) {
+                if (presetName === 'user') {
+                    // User preset is never shown as "modified" since it's inherently custom
+                    return false;
+                } else if (PRESET_CONFIGS[presetName]) {
+                    // Named presets are modified if they exist in appState.presets
+                    return !!(this.appState && this.appState.presets && this.appState.presets[presetName]);
+                }
                 
-                Object.keys(settings).forEach(key => {
-                    const element = document.getElementById(key);
-                    if (element) {
-                        element.value = settings[key];
-                    }
+                return false;
+            }
+            
+            updatePresetDisplay() {
+                const presetsSelect = document.getElementById('presets');
+                
+                // Update all preset option text to show/hide asterisks
+                presetsSelect.querySelectorAll('option').forEach(option => {
+                    option.textContent = this.getPresetDisplayName(option.value, true);
                 });
-                
-                this.isLoadingPreset = false;
-                this.updateConstraints();
-                this.updateResetButton();
-                this.update();
             }
 
             loadPreset(presetName) {
-                if (presetName === 'user') {
-                    if (this.userSettings) {
-                        this.applySettings(this.userSettings);
-                    }
-                    return;
+                // Update app state to track current preset selection
+                this.appState.currentPreset = presetName;
+                
+                const presetSettings = this.getCurrentPresetSettings(presetName);
+                if (presetSettings) {
+                    this.setState({ ...presetSettings, currentPreset: presetName });
+                    this.updateUI();
                 }
-
-                // Save current settings as user settings if not already saved
-                if (!this.userSettings) {
-                    this.userSettings = this.getCurrentSettings();
-                }
-
-                if (PRESET_CONFIGS[presetName]) {
-                    this.applySettings(PRESET_CONFIGS[presetName]);
-                }
+                
+                // Only save when this is a user-initiated preset change, not during initialization
+                // The preset selection is already tracked in this.appState.currentPreset
+                // and will be saved when the user makes actual changes
             }
 
             updateConstraints() {
-                // Clamp input values to reasonable limits to prevent browser lockup
-                const sizeXEl = document.getElementById('sizeX');
-                const sizeYEl = document.getElementById('sizeY');
-                const sizeZEl = document.getElementById('sizeZ');
-
-                let sizeX = parseInt(sizeXEl.value) || 1;
-                let sizeY = parseInt(sizeYEl.value) || 1;
-                let sizeZ = parseInt(sizeZEl.value) || 1;
+                
+                // Validate and clamp state values to reasonable limits
+                let updates = {};
+                let { sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, queryX1, queryX2, queryY1, queryY2, queryZ1, queryZ2 } = this.state;
 
                 // Cap dimensions to prevent browser lockup
-                if (sizeX > 64) { sizeX = 64; sizeXEl.value = 64; }
-                if (sizeY > 64) { sizeY = 64; sizeYEl.value = 64; }
-                if (sizeZ > 16) { sizeZ = 16; sizeZEl.value = 16; }
+                if (sizeX > 64) { updates.sizeX = 64; sizeX = 64; }
+                if (sizeY > 64) { updates.sizeY = 64; sizeY = 64; }
+                if (sizeZ > 16) { updates.sizeZ = 16; sizeZ = 16; }
 
                 // Also prevent total cells from being too large
                 const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
                 if (totalCells > 4096) {
                     // Reset to safer defaults if total is too large
-                    sizeX = 32; sizeXEl.value = 32;
-                    sizeY = 32; sizeYEl.value = 32;
-                    sizeZ = 1; sizeZEl.value = 1;
+                    updates.sizeX = 32; sizeX = 32;
+                    updates.sizeY = 32; sizeY = 32;
+                    updates.sizeZ = 1; sizeZ = 1;
                 }
 
-                // Z controls are statically hidden for now
-
-                // Update all constraints
-                document.getElementById('chunkX').max = sizeX;
-                document.getElementById('chunkY').max = sizeY;
-                document.getElementById('chunkZ').max = Math.max(1, sizeZ);
-
-                document.getElementById('queryX1').max = Math.max(0, sizeX - 1);
-                document.getElementById('queryX2').max = Math.max(0, sizeX - 1);
-                document.getElementById('queryY1').max = Math.max(0, sizeY - 1);
-                document.getElementById('queryY2').max = Math.max(0, sizeY - 1);
-                document.getElementById('queryZ1').max = Math.max(0, sizeZ - 1);
-                document.getElementById('queryZ2').max = Math.max(0, sizeZ - 1);
-
                 // Clamp chunk sizes to valid ranges
-                const chunkX = document.getElementById('chunkX');
-                const chunkY = document.getElementById('chunkY');
-                const chunkZ = document.getElementById('chunkZ');
-
-                if (parseInt(chunkX.value) > sizeX) chunkX.value = sizeX;
-                if (parseInt(chunkY.value) > sizeY) chunkY.value = sizeY;
-                if (parseInt(chunkZ.value) > sizeZ) chunkZ.value = Math.max(1, sizeZ);
+                if (chunkX > sizeX) { updates.chunkX = sizeX; chunkX = sizeX; }
+                if (chunkY > sizeY) { updates.chunkY = sizeY; chunkY = sizeY; }
+                if (chunkZ > sizeZ) { updates.chunkZ = Math.max(1, sizeZ); chunkZ = Math.max(1, sizeZ); }
 
                 // Clamp query values to valid ranges
-                const queryX1 = document.getElementById('queryX1');
-                const queryX2 = document.getElementById('queryX2');
-                const queryY1 = document.getElementById('queryY1');
-                const queryY2 = document.getElementById('queryY2');
-                const queryZ1 = document.getElementById('queryZ1');
-                const queryZ2 = document.getElementById('queryZ2');
-
                 const maxX = sizeX - 1;
                 const maxY = sizeY - 1;
                 const maxZ = sizeZ - 1;
 
-                if (parseInt(queryX1.value) > maxX) queryX1.value = Math.max(0, maxX);
-                if (parseInt(queryX2.value) > maxX) queryX2.value = Math.max(0, maxX);
-                if (parseInt(queryY1.value) > maxY) queryY1.value = Math.max(0, maxY);
-                if (parseInt(queryY2.value) > maxY) queryY2.value = Math.max(0, maxY);
-                if (parseInt(queryZ1.value) > maxZ) queryZ1.value = Math.max(0, maxZ);
-                if (parseInt(queryZ2.value) > maxZ) queryZ2.value = Math.max(0, maxZ);
+                if (queryX1 > maxX) { updates.queryX1 = Math.max(0, maxX); }
+                if (queryX2 > maxX) { updates.queryX2 = Math.max(0, maxX); }
+                if (queryY1 > maxY) { updates.queryY1 = Math.max(0, maxY); }
+                if (queryY2 > maxY) { updates.queryY2 = Math.max(0, maxY); }
+                if (queryZ1 > maxZ) { updates.queryZ1 = Math.max(0, maxZ); }
+                if (queryZ2 > maxZ) { updates.queryZ2 = Math.max(0, maxZ); }
 
-                // Handle edge case: if array dimension is 1, set sensible defaults
+                // Handle edge cases: if array dimension is 1, set sensible defaults
                 if (sizeX === 1) {
-                    chunkX.value = 1;
-                    queryX1.value = 0;
-                    queryX2.value = 0;
+                    updates.chunkX = 1;
+                    updates.queryX1 = 0;
+                    updates.queryX2 = 0;
                 }
                 if (sizeY === 1) {
-                    chunkY.value = 1;
-                    queryY1.value = 0;
-                    queryY2.value = 0;
+                    updates.chunkY = 1;
+                    updates.queryY1 = 0;
+                    updates.queryY2 = 0;
                 }
                 if (sizeZ === 1) {
-                    chunkZ.value = 1;
-                    queryZ1.value = 0;
-                    queryZ2.value = 0;
+                    updates.chunkZ = 1;
+                    updates.queryZ1 = 0;
+                    updates.queryZ2 = 0;
+                }
+
+                // Update DOM constraints for HTML validation
+                const finalSizeX = updates.sizeX || sizeX;
+                const finalSizeY = updates.sizeY || sizeY;
+                const finalSizeZ = updates.sizeZ || sizeZ;
+
+                document.getElementById('chunkX').max = finalSizeX;
+                document.getElementById('chunkY').max = finalSizeY;
+                document.getElementById('chunkZ').max = Math.max(1, finalSizeZ);
+
+                document.getElementById('queryX1').max = Math.max(0, finalSizeX - 1);
+                document.getElementById('queryX2').max = Math.max(0, finalSizeX - 1);
+                document.getElementById('queryY1').max = Math.max(0, finalSizeY - 1);
+                document.getElementById('queryY2').max = Math.max(0, finalSizeY - 1);
+                document.getElementById('queryZ1').max = Math.max(0, finalSizeZ - 1);
+                document.getElementById('queryZ2').max = Math.max(0, finalSizeZ - 1);
+
+                // Apply any needed state updates
+                if (Object.keys(updates).length > 0) {
+                    this.setState(updates);
+                    this.renderUI(); // Only update form values, don't trigger full UI cycle
                 }
             }
 
@@ -1175,25 +1273,22 @@
 
             getParameters() {
                 return {
-                    cellAlgorithm: document.getElementById('cellAlgorithm').value,
-                    chunkAlgorithm: document.getElementById('chunkAlgorithm').value,
+                    cellAlgorithm: this.state.cellAlgorithm,
+                    chunkAlgorithm: this.state.chunkAlgorithm,
                     size: [
-                        parseInt(document.getElementById('sizeX').value) || 1,
-                        parseInt(document.getElementById('sizeY').value) || 1,
-                        parseInt(document.getElementById('sizeZ').value) || 0
+                        this.state.sizeX,
+                        this.state.sizeY,
+                        this.state.sizeZ || 0
                     ],
                     chunk: [
-                        parseInt(document.getElementById('chunkX').value) || 1,
-                        parseInt(document.getElementById('chunkY').value) || 1,
-                        parseInt(document.getElementById('chunkZ').value) || 1
+                        this.state.chunkX,
+                        this.state.chunkY,
+                        this.state.chunkZ
                     ],
                     query: {
-                        x: [parseInt(document.getElementById('queryX1').value) || 0,
-                            parseInt(document.getElementById('queryX2').value) || 0],
-                        y: [parseInt(document.getElementById('queryY1').value) || 0,
-                            parseInt(document.getElementById('queryY2').value) || 0],
-                        z: [parseInt(document.getElementById('queryZ1').value) || 0,
-                            parseInt(document.getElementById('queryZ2').value) || 0]
+                        x: [this.state.queryX1, this.state.queryX2],
+                        y: [this.state.queryY1, this.state.queryY2],
+                        z: [this.state.queryZ1, this.state.queryZ2]
                     }
                 };
             }
@@ -1683,23 +1778,6 @@
 
             update() {
                 const params = this.getParameters();
-
-                // Clear caches if parameters changed significantly
-                const paramsChanged = this.lastParams && (
-                    this.lastParams.cellAlgorithm !== params.cellAlgorithm ||
-                    this.lastParams.chunkAlgorithm !== params.chunkAlgorithm ||
-                    JSON.stringify(this.lastParams.size) !== JSON.stringify(params.size) ||
-                    JSON.stringify(this.lastParams.chunk) !== JSON.stringify(params.chunk)
-                );
-
-                if (paramsChanged) {
-                    this.linearizationCache.clear();
-                    this.positionCache.clear();
-                    if (this.chunkPositionCache) this.chunkPositionCache.clear();
-                    if (this.cellPositionCache) this.cellPositionCache.clear();
-                    if (this.colorCache) this.colorCache.clear();
-                }
-                this.lastParams = { ...params };
 
                 // Update Z range visibility
                 document.getElementById('zRange').style.display =
