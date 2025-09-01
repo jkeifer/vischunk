@@ -572,6 +572,8 @@
                 this.hoveredCell = null;
                 this.hoveredChunk = null;
                 this.linearizationCache = new Map();
+                this.positionCache = new Map();
+                this.lastCanvasSize = new Map();
                 this.initializeControls();
                 this.initializeCanvases();
                 this.update();
@@ -671,26 +673,54 @@
                 this.tooltip = document.getElementById('tooltip');
 
                 this.resizeCanvases();
-                window.addEventListener('resize', () => this.resizeCanvases());
+                // Debounce resize events for better performance
+                let resizeTimeout;
+                window.addEventListener('resize', () => {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        const needsUpdate = this.resizeCanvases();
+                        if (needsUpdate) {
+                            this.update();
+                        }
+                    }, 150);
+                });
             }
 
             resizeCanvases() {
+                let needsUpdate = false;
+                
                 // Spatial canvases - square aspect
                 ['spatialUnchunked', 'spatialChunked'].forEach(key => {
                     const canvas = this.canvases[key];
                     const rect = canvas.getBoundingClientRect();
                     const size = Math.min(rect.width, 400);
-                    canvas.width = size;
-                    canvas.height = size;
+                    const lastSize = this.lastCanvasSize.get(key);
+                    
+                    if (!lastSize || lastSize.width !== size || lastSize.height !== size) {
+                        canvas.width = size;
+                        canvas.height = size;
+                        this.lastCanvasSize.set(key, { width: size, height: size });
+                        needsUpdate = true;
+                    }
                 });
 
                 // Linear canvases - full width
                 ['linearUnchunked', 'linearChunked'].forEach(key => {
                     const canvas = this.canvases[key];
                     const rect = canvas.getBoundingClientRect();
-                    canvas.width = rect.width;
-                    canvas.height = 120;
+                    const width = rect.width;
+                    const height = 120;
+                    const lastSize = this.lastCanvasSize.get(key);
+                    
+                    if (!lastSize || lastSize.width !== width || lastSize.height !== height) {
+                        canvas.width = width;
+                        canvas.height = height;
+                        this.lastCanvasSize.set(key, { width, height });
+                        needsUpdate = true;
+                    }
                 });
+                
+                return needsUpdate;
             }
 
             getParameters() {
@@ -1111,14 +1141,17 @@
             update() {
                 const params = this.getParameters();
 
-                // Clear linearization cache if parameters changed significantly
-                if (this.lastParams && (
+                // Clear caches if parameters changed significantly
+                const paramsChanged = this.lastParams && (
                     this.lastParams.cellAlgorithm !== params.cellAlgorithm ||
                     this.lastParams.chunkAlgorithm !== params.chunkAlgorithm ||
                     JSON.stringify(this.lastParams.size) !== JSON.stringify(params.size) ||
                     JSON.stringify(this.lastParams.chunk) !== JSON.stringify(params.chunk)
-                )) {
+                );
+                
+                if (paramsChanged) {
                     this.linearizationCache.clear();
+                    this.positionCache.clear();
                     if (this.chunkPositionCache) this.chunkPositionCache.clear();
                     if (this.cellPositionCache) this.cellPositionCache.clear();
                 }
@@ -1339,30 +1372,36 @@
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
 
-                // First, create a mapping of chunk coordinates to their linearization order
-                const chunkPositions = [];
-                for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
-                    for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
-                        const firstCellX = chunkCX * chunkX;
-                        const firstCellY = chunkCY * chunkY;
-                        const linearPos = this.linearizeCoordinate(chunkCX, chunkCY, 0, chunksX, chunksY, 1, params.chunkAlgorithm);
-                        chunkPositions.push({
-                            chunkCX,
-                            chunkCY,
-                            linearPos
-                        });
+                // Cache chunk color mapping for performance
+                const chunkMapKey = `${chunksX},${chunksY},${params.chunkAlgorithm}`;
+                let chunkColorMap = this.positionCache.get(chunkMapKey);
+                
+                if (!chunkColorMap) {
+                    // First, create a mapping of chunk coordinates to their linearization order
+                    const chunkPositions = [];
+                    for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
+                        for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
+                            const linearPos = this.linearizeCoordinate(chunkCX, chunkCY, 0, chunksX, chunksY, 1, params.chunkAlgorithm);
+                            chunkPositions.push({
+                                chunkCX,
+                                chunkCY,
+                                linearPos
+                            });
+                        }
                     }
+                    
+                    // Sort chunks by their linearization position
+                    chunkPositions.sort((a, b) => a.linearPos - b.linearPos);
+                    
+                    // Create a map from chunk coordinates to color index
+                    chunkColorMap = new Map();
+                    chunkPositions.forEach((chunk, index) => {
+                        const key = `${chunk.chunkCX},${chunk.chunkCY}`;
+                        chunkColorMap.set(key, index);
+                    });
+                    
+                    this.positionCache.set(chunkMapKey, chunkColorMap);
                 }
-                
-                // Sort chunks by their linearization position
-                chunkPositions.sort((a, b) => a.linearPos - b.linearPos);
-                
-                // Create a map from chunk coordinates to color index
-                const chunkColorMap = new Map();
-                chunkPositions.forEach((chunk, index) => {
-                    const key = `${chunk.chunkCX},${chunk.chunkCY}`;
-                    chunkColorMap.set(key, index);
-                });
                 
                 // Now draw each cell using its chunk's color
                 for (let y = 0; y < sizeY; y++) {
@@ -1574,13 +1613,19 @@
                 const chunksY = Math.ceil(sizeY / chunkSizeY);
                 const totalChunks = chunksX * chunksY;
                 
-                // Create a map from global position to cell coordinates
-                const positionToCell = new Map();
-                for (let y = 0; y < sizeY; y++) {
-                    for (let x = 0; x < sizeX; x++) {
-                        const globalPos = this.getGlobalPosition(x, y, 0, params);
-                        positionToCell.set(globalPos, {x, y});
+                // Cache position-to-cell mapping for performance
+                const posMapKey = `${sizeX},${sizeY},${params.cellAlgorithm},${params.chunkAlgorithm},${chunkSizeX},${chunkSizeY}`;
+                let positionToCell = this.positionCache.get(posMapKey);
+                
+                if (!positionToCell) {
+                    positionToCell = new Map();
+                    for (let y = 0; y < sizeY; y++) {
+                        for (let x = 0; x < sizeX; x++) {
+                            const globalPos = this.getGlobalPosition(x, y, 0, params);
+                            positionToCell.set(globalPos, {x, y});
+                        }
                     }
+                    this.positionCache.set(posMapKey, positionToCell);
                 }
                 
                 for (let i = 0; i < data.totalCells; i++) {
