@@ -337,12 +337,34 @@
             border-radius: 3px;
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
+
+        .reset-button {
+            display: block;
+            margin: 20px auto;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            width: fit-content;
+        }
+
+        .reset-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #4a9eff;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Multidimensional Data Linearization Visualizer</h1>
         <p class="subtitle">Explore how chunking and linearization strategies affect read patterns</p>
+        
+        <button class="reset-button" id="resetButton">Reset to Defaults</button>
 
         <div class="controls">
             <div class="control-section">
@@ -580,6 +602,7 @@
                 this.linearizationCache = new Map();
                 this.positionCache = new Map();
                 this.lastCanvasSize = new Map();
+                this.loadSettings();
                 this.initializeControls();
                 this.initializeCanvases();
                 this.update();
@@ -595,21 +618,113 @@
                     const element = document.getElementById(id);
                     element.addEventListener('change', () => {
                         this.updateConstraints();
+                        this.saveSettings();
                         this.update();
                     });
-                    element.addEventListener('input', () => {
-                        this.updateConstraints();
-                        this.update();
-                    });
+                });
+
+                // Add reset button handler
+                document.getElementById('resetButton').addEventListener('click', () => {
+                    this.resetSettings();
                 });
 
                 this.updateConstraints();
             }
 
+            saveSettings() {
+                const settings = {
+                    cellAlgorithm: document.getElementById('cellAlgorithm').value,
+                    chunkAlgorithm: document.getElementById('chunkAlgorithm').value,
+                    sizeX: document.getElementById('sizeX').value,
+                    sizeY: document.getElementById('sizeY').value,
+                    sizeZ: document.getElementById('sizeZ').value,
+                    chunkX: document.getElementById('chunkX').value,
+                    chunkY: document.getElementById('chunkY').value,
+                    chunkZ: document.getElementById('chunkZ').value,
+                    queryX1: document.getElementById('queryX1').value,
+                    queryX2: document.getElementById('queryX2').value,
+                    queryY1: document.getElementById('queryY1').value,
+                    queryY2: document.getElementById('queryY2').value,
+                    queryZ1: document.getElementById('queryZ1').value,
+                    queryZ2: document.getElementById('queryZ2').value
+                };
+                localStorage.setItem('vischunk-settings', JSON.stringify(settings));
+            }
+
+            loadSettings() {
+                try {
+                    const saved = localStorage.getItem('vischunk-settings');
+                    if (saved) {
+                        const settings = JSON.parse(saved);
+                        
+                        // Apply settings to controls
+                        Object.keys(settings).forEach(key => {
+                            const element = document.getElementById(key);
+                            if (element) {
+                                element.value = settings[key];
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Failed to load settings from localStorage:', error);
+                }
+            }
+
+            resetSettings() {
+                // Reset all controls to their default values
+                const defaults = {
+                    cellAlgorithm: 'row-major',
+                    chunkAlgorithm: 'row-major',
+                    sizeX: '16',
+                    sizeY: '16',
+                    sizeZ: '1',
+                    chunkX: '4',
+                    chunkY: '4',
+                    chunkZ: '1',
+                    queryX1: '3',
+                    queryX2: '10',
+                    queryY1: '3',
+                    queryY2: '10',
+                    queryZ1: '0',
+                    queryZ2: '0'
+                };
+
+                Object.keys(defaults).forEach(key => {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        element.value = defaults[key];
+                    }
+                });
+
+                // Update constraints, save settings, and refresh visualization
+                this.updateConstraints();
+                this.saveSettings();
+                this.update();
+            }
+
             updateConstraints() {
-                const sizeX = parseInt(document.getElementById('sizeX').value) || 1;
-                const sizeY = parseInt(document.getElementById('sizeY').value) || 1;
-                const sizeZ = parseInt(document.getElementById('sizeZ').value) || 1;
+                // Clamp input values to reasonable limits to prevent browser lockup
+                const sizeXEl = document.getElementById('sizeX');
+                const sizeYEl = document.getElementById('sizeY');
+                const sizeZEl = document.getElementById('sizeZ');
+                
+                let sizeX = parseInt(sizeXEl.value) || 1;
+                let sizeY = parseInt(sizeYEl.value) || 1;
+                let sizeZ = parseInt(sizeZEl.value) || 1;
+                
+                // Cap dimensions to prevent browser lockup
+                if (sizeX > 64) { sizeX = 64; sizeXEl.value = 64; }
+                if (sizeY > 64) { sizeY = 64; sizeYEl.value = 64; }
+                if (sizeZ > 16) { sizeZ = 16; sizeZEl.value = 16; }
+                
+                // Also prevent total cells from being too large
+                const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
+                if (totalCells > 4096) {
+                    // Reset to safer defaults if total is too large
+                    sizeX = 32; sizeXEl.value = 32;
+                    sizeY = 32; sizeYEl.value = 32;
+                    sizeZ = 1; sizeZEl.value = 1;
+                }
 
                 // Z controls are statically hidden for now
 
