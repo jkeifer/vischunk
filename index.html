@@ -249,9 +249,15 @@
 
         .explanation-content {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 25px;
             margin-top: 25px;
+        }
+
+        @media (min-width: 1200px) {
+            .explanation-content {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
 
         .explanation-section {
