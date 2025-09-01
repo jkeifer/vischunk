@@ -37,12 +37,40 @@
             text-align: center;
         }
 
-        .controls-container {
+        .section-container {
             background: rgba(255, 255, 255, 0.03);
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 30px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+
+        .section-container h2 {
+            color: #fff;
+            font-size: 1.3em;
+            margin: 0 0 20px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .simulation-wrapper {
+            max-width: 1600px;
+            margin: 40px auto 0 auto;
+            padding: 30px 20px 40px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .simulation-wrapper > h2 {
+            color: #fff;
+            font-size: 1.8em;
+            margin-bottom: 25px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .controls {
@@ -354,7 +382,7 @@
 
         .reset-button {
             display: block;
-            margin: 20px auto;
+            margin: 0 auto;
             padding: 8px 16px;
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.3);
@@ -386,11 +414,14 @@
                 View on GitHub
             </a>
         </div>
-        
-        <button class="reset-button" id="resetButton">Reset to Defaults</button>
 
-        <div class="controls">
-            <div class="control-section">
+        <div class="simulation-wrapper">
+            <h2>Interactive Simulation</h2>
+            
+            <div class="section-container">
+                <h2>Simulation Controls</h2>
+            <div class="controls">
+                <div class="control-section">
                 <div class="section-title">Array Settings</div>
                 <div class="control-group">
                     <label>Array Size X</label>
@@ -468,7 +499,46 @@
                 </div>
             </div>
         </div>
+        
+        <button class="reset-button" id="resetButton">Reset to Defaults</button>
+    </div>
 
+    <div class="section-container">
+        <h2>Performance Metrics</h2>
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-label">Requested Cells</div>
+                <div class="metric-value" id="requested-cells">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Actual Cells Read</div>
+                <div class="metric-value" id="actual-cells">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Read Amplification</div>
+                <div class="metric-value" id="amplification">1.0<span class="metric-suffix">x</span></div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Efficiency</div>
+                <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Chunks Touched</div>
+                <div class="metric-value" id="chunks-touched">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Range Reads</div>
+                <div class="metric-value" id="byte-ranges">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Coalescing Factor</div>
+                <div class="metric-value" id="coalescing-factor">1.0<span class="metric-suffix">x</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-container">
+        <h2>Spatial Visualization</h2>
         <div class="spatial-views">
             <div class="viz-panel">
                 <div class="viz-title">Logical Array (Cell Linearization within Chunks)</div>
@@ -504,7 +574,10 @@
                 </div>
             </div>
         </div>
+    </div>
 
+    <div class="section-container">
+        <h2>Linear Storage Visualization</h2>
         <div class="linear-views">
             <div class="linear-viz">
                 <div class="viz-title">Linear Storage (Combined Linearization)</div>
@@ -520,38 +593,8 @@
                 </div>
             </div>
         </div>
-
-        <div class="metrics">
-            <div class="metric">
-                <div class="metric-label">Requested Cells</div>
-                <div class="metric-value" id="requested-cells">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Actual Cells Read</div>
-                <div class="metric-value" id="actual-cells">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Read Amplification</div>
-                <div class="metric-value" id="amplification">1.0<span class="metric-suffix">x</span></div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Efficiency</div>
-                <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Chunks Touched</div>
-                <div class="metric-value" id="chunks-touched">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Range Reads</div>
-                <div class="metric-value" id="byte-ranges">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Coalescing Factor</div>
-                <div class="metric-value" id="coalescing-factor">1.0<span class="metric-suffix">x</span></div>
-            </div>
-        </div>
     </div>
+        </div>
 
     <div class="tooltip" id="tooltip"></div>
 
