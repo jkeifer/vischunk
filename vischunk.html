@@ -514,8 +514,8 @@
                 for (const [key, canvas] of Object.entries(this.canvases)) {
                     this.contexts[key] = canvas.getContext('2d');
 
-                    // Add mouse interaction for spatial views
-                    if (key.startsWith('spatial')) {
+                    // Add mouse interaction for spatial and linear views
+                    if (key.startsWith('spatial') || key.startsWith('linear')) {
                         canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e, key));
                         canvas.addEventListener('mouseleave', () => this.handleMouseLeave());
                     }
@@ -836,7 +836,7 @@
                         this.hoveredChunk = null;
                         this.tooltip.style.display = 'none';
                     }
-                } else {
+                } else if (canvasKey === 'spatialChunked') {
                     // Cell-level interaction for chunked view (but highlight whole chunks)
                     const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
                     const offsetX = (canvas.width - sizeX * cellSize) / 2;
@@ -867,6 +867,85 @@
                         this.tooltip.style.top = `${e.clientY - 30}px`;
                         this.tooltip.textContent = `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`;
                     } else {
+                        this.hoveredChunk = null;
+                        this.tooltip.style.display = 'none';
+                    }
+                } else if (canvasKey.startsWith('linear')) {
+                    // Linear view interaction
+                    const data = this.currentData;
+                    if (!data) return;
+                    
+                    const cellWidth = (canvas.width - 40) / data.totalCells;
+                    const offsetX = 20;
+                    const barHeight = 60;
+                    const offsetY = 20;
+                    
+                    // Check if mouse is over the bar area
+                    if (y >= offsetY && y <= offsetY + barHeight) {
+                        const cellIndex = Math.floor((x - offsetX) / cellWidth);
+                        
+                        if (cellIndex >= 0 && cellIndex < data.totalCells) {
+                            // Find which cell this linear position corresponds to
+                            let foundCell = null;
+                            for (let cy = 0; cy < sizeY; cy++) {
+                                for (let cx = 0; cx < sizeX; cx++) {
+                                    const globalPos = this.getGlobalPosition(cx, cy, 0, params);
+                                    if (globalPos === cellIndex) {
+                                        foundCell = { x: cx, y: cy };
+                                        break;
+                                    }
+                                }
+                                if (foundCell) break;
+                            }
+                            
+                            if (foundCell) {
+                                if (canvasKey === 'linearUnchunked') {
+                                    // Hovering cell linearization view - highlight individual cell
+                                    this.hoveredCell = foundCell;
+                                    this.hoveredChunk = {
+                                        x: Math.floor(foundCell.x / chunkX),
+                                        y: Math.floor(foundCell.y / chunkY)
+                                    };
+                                    
+                                    const intraChunkPos = this.getIntraChunkPosition(foundCell.x, foundCell.y, 0, params);
+                                    const globalPos = this.getGlobalPosition(foundCell.x, foundCell.y, 0, params);
+                                    this.tooltip.style.display = 'block';
+                                    this.tooltip.style.left = `${e.clientX + 10}px`;
+                                    this.tooltip.style.top = `${e.clientY - 30}px`;
+                                    this.tooltip.textContent = `Cell (${foundCell.x}, ${foundCell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`;
+                                } else {
+                                    // Hovering chunked linearization view - highlight chunk
+                                    this.hoveredCell = null;
+                                    this.hoveredChunk = {
+                                        x: Math.floor(foundCell.x / chunkX),
+                                        y: Math.floor(foundCell.y / chunkY)
+                                    };
+                                    
+                                    const chunksX = Math.ceil(sizeX / chunkX);
+                                    const chunkIdx = this.hoveredChunk.x + this.hoveredChunk.y * chunksX;
+                                    const startX = this.hoveredChunk.x * chunkX;
+                                    const startY = this.hoveredChunk.y * chunkY;
+                                    const endX = Math.min(startX + chunkX - 1, sizeX - 1);
+                                    const endY = Math.min(startY + chunkY - 1, sizeY - 1);
+                                    const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
+                                    
+                                    this.tooltip.style.display = 'block';
+                                    this.tooltip.style.left = `${e.clientX + 10}px`;
+                                    this.tooltip.style.top = `${e.clientY - 30}px`;
+                                    this.tooltip.textContent = `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`;
+                                }
+                            } else {
+                                this.hoveredCell = null;
+                                this.hoveredChunk = null;
+                                this.tooltip.style.display = 'none';
+                            }
+                        } else {
+                            this.hoveredCell = null;
+                            this.hoveredChunk = null;
+                            this.tooltip.style.display = 'none';
+                        }
+                    } else {
+                        this.hoveredCell = null;
                         this.hoveredChunk = null;
                         this.tooltip.style.display = 'none';
                     }
@@ -904,6 +983,7 @@
 
                 // Calculate data
                 const data = this.calculateData(params);
+                this.currentData = data; // Store for mouse interactions
 
                 // Draw all views
                 this.drawSpatialUnchunked(params, data);
