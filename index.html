@@ -512,16 +512,20 @@
                 <div class="metric-value" id="amplification">1.0<span class="metric-suffix">x</span></div>
             </div>
             <div class="metric">
+                <div class="metric-label">Efficiency</div>
+                <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
+            </div>
+            <div class="metric">
                 <div class="metric-label">Chunks Touched</div>
                 <div class="metric-value" id="chunks-touched">0</div>
             </div>
             <div class="metric">
-                <div class="metric-label">Byte Ranges</div>
+                <div class="metric-label">Range Reads</div>
                 <div class="metric-value" id="byte-ranges">0</div>
             </div>
             <div class="metric">
-                <div class="metric-label">Efficiency</div>
-                <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
+                <div class="metric-label">Coalescing Factor</div>
+                <div class="metric-value" id="coalescing-factor">1.0<span class="metric-suffix">x</span></div>
             </div>
         </div>
     </div>
@@ -561,13 +565,19 @@
 
             <div class="explanation-section">
                 <h3>Performance Metrics</h3>
+                <p><strong>Requested Cells:</strong> The number of cells in your query region that you actually want to read.</p>
+
+                <p><strong>Actual Cells Read:</strong> The total number of cells that must be read due to chunking, including both requested and extra cells.</p>
+
                 <p><strong>Read Amplification:</strong> Shows how much extra data you read due to chunking. Values > 1.0 indicate wasted bandwidth. Lower is better.</p>
 
                 <p><strong>Efficiency:</strong> Percentage of useful data in each read operation. Higher percentages indicate better performance with less wasted I/O.</p>
 
-                <p><strong>Byte Ranges:</strong> Number of separate read operations needed. Fewer ranges reduce I/O overhead and improve performance.</p>
-
                 <p><strong>Chunks Touched:</strong> How many chunks intersect with your query region. Fewer chunks generally mean more efficient access patterns.</p>
+
+                <p><strong>Range Reads:</strong> Number of separate read operations needed. Fewer range reads reduce I/O overhead and improve performance.</p>
+
+                <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality.</p>
             </div>
 
             <div class="explanation-section">
@@ -1954,6 +1964,7 @@
 
             updateMetrics(data) {
                 const amplification = data.actualCells.size / Math.max(1, data.requestedCells.size);
+                const coalescingFactor = data.touchedChunks.size / Math.max(1, data.chunkedRanges.length);
 
                 document.getElementById('requested-cells').textContent = data.requestedCells.size;
                 document.getElementById('actual-cells').textContent = data.actualCells.size;
@@ -1963,6 +1974,8 @@
                 document.getElementById('byte-ranges').textContent = data.chunkedRanges.length;
                 document.getElementById('efficiency').innerHTML =
                     (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
+                document.getElementById('coalescing-factor').innerHTML =
+                    coalescingFactor.toFixed(1) + '<span class="metric-suffix">x</span>';
             }
         }
 
