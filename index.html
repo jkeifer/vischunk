@@ -422,6 +422,7 @@
             background: rgba(255, 255, 255, 0.2);
             border-color: #4a9eff;
         }
+
     </style>
 </head>
 <body>
@@ -443,23 +444,41 @@
 
             <div class="section-container">
                 <h2>Simulation Controls</h2>
+                
+                <div style="display: flex; align-items: flex-end; gap: 20px; margin-bottom: 20px;">
+                    <div class="control-group">
+                        <label>Scenario Presets</label>
+                        <select id="presets">
+                            <option value="user">User Settings</option>
+                            <option value="small-tiles">Small Tiles vs Large Query</option>
+                            <option value="large-tiles">Large Tiles vs Small Query</option>
+                            <option value="row-vs-col">Row-Major vs Column-Major</option>
+                            <option value="spatial-locality">Spatial Locality Comparison</option>
+                            <option value="fragmentation">High Fragmentation Scenario</option>
+                            <option value="perfect-alignment">Perfect Chunk Alignment</option>
+                        </select>
+                    </div>
+                    <button class="reset-button" id="resetButton" style="margin: 0;">reset to default</button>
+                </div>
+                
             <div class="controls">
                 <div class="control-section">
                 <div class="section-title">Array Settings</div>
                 <div class="control-group">
                     <label>Array Size X</label>
-                    <input type="number" id="sizeX" min="1" max="32" value="16">
+                    <input type="number" id="sizeX" min="1" max="64" value="16">
                 </div>
 
                 <div class="control-group">
                     <label>Array Size Y</label>
-                    <input type="number" id="sizeY" min="1" max="32" value="16">
+                    <input type="number" id="sizeY" min="1" max="64" value="16">
                 </div>
 
                 <div class="control-group z-control" id="arraySizeZGroup">
                     <label>Array Size Z</label>
                     <input type="number" id="sizeZ" min="1" max="16" value="1">
                 </div>
+
 
                 <div class="control-group">
                     <label>Cell Linearization (within chunk)</label>
@@ -476,17 +495,17 @@
                 <div class="section-title">Chunk Settings</div>
                 <div class="control-group">
                     <label>Chunk Size X</label>
-                    <input type="number" id="chunkX" min="1" max="32" value="4">
+                    <input type="number" id="chunkX" min="1" max="64" value="4">
                 </div>
 
                 <div class="control-group">
                     <label>Chunk Size Y</label>
-                    <input type="number" id="chunkY" min="1" max="32" value="4">
+                    <input type="number" id="chunkY" min="1" max="64" value="4">
                 </div>
 
                 <div class="control-group z-control" id="chunkZGroup">
                     <label>Chunk Size Z</label>
-                    <input type="number" id="chunkZ" min="1" max="32" value="1">
+                    <input type="number" id="chunkZ" min="1" max="16" value="1">
                 </div>
 
                 <div class="control-group">
@@ -523,16 +542,11 @@
             </div>
         </div>
 
-        <button class="reset-button" id="resetButton">Reset to Defaults</button>
     </div>
 
     <div class="section-container">
         <h2>Performance Metrics</h2>
         <div class="metrics">
-            <div class="metric">
-                <div class="metric-label">Query Coverage</div>
-                <div class="metric-value" id="query-coverage">0<span class="metric-suffix">%</span></div>
-            </div>
             <div class="metric">
                 <div class="metric-label">Requested Cells</div>
                 <div class="metric-value" id="requested-cells">0</div>
@@ -546,7 +560,7 @@
                 <div class="metric-value" id="amplification">1.0<span class="metric-suffix">x</span></div>
             </div>
             <div class="metric">
-                <div class="metric-label">Efficiency</div>
+                <div class="metric-label">Read Efficiency</div>
                 <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
             </div>
             <div class="metric">
@@ -560,6 +574,10 @@
             <div class="metric">
                 <div class="metric-label">Coalescing Factor</div>
                 <div class="metric-value" id="coalescing-factor">1.0<span class="metric-suffix">x</span></div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Storage Alignment</div>
+                <div class="metric-value" id="storage-alignment">1.0</div>
             </div>
         </div>
     </div>
@@ -661,13 +679,14 @@
 
                 <p><strong>Read Amplification:</strong> Shows how much extra data you read due to chunking. Values > 1.0 indicate wasted bandwidth. Lower is better.</p>
 
-                <p><strong>Efficiency:</strong> Percentage of useful data in each read operation. Higher percentages indicate better performance with less wasted I/O.</p>
+                <p><strong>Read Efficiency:</strong> Percentage of useful data in each read operation. Higher percentages indicate better performance with less wasted I/O.</p>
 
                 <p><strong>Chunks Touched:</strong> How many chunks intersect with your query region. Fewer chunks generally mean more efficient access patterns.</p>
 
                 <p><strong>Range Reads:</strong> Number of separate read operations needed. Fewer range reads reduce I/O overhead and improve performance.</p>
 
                 <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality.</p>
+                <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read efficiency and coalescing. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
             </div>
 
             <div class="explanation-section">
@@ -702,6 +721,8 @@
                 this.linearizationCache = new Map();
                 this.positionCache = new Map();
                 this.lastCanvasSize = new Map();
+                this.userSettings = null;
+                this.isLoadingPreset = false;
                 this.loadSettings();
                 this.initializeControls();
                 this.initializeCanvases();
@@ -717,10 +738,22 @@
                 controls.forEach(id => {
                     const element = document.getElementById(id);
                     element.addEventListener('change', () => {
+                        if (!this.isLoadingPreset) {
+                            // Only save settings if in user mode
+                            if (document.getElementById('presets').value === 'user') {
+                                this.userSettings = this.getCurrentSettings();
+                                this.saveSettings();
+                            }
+                        }
                         this.updateConstraints();
-                        this.saveSettings();
+                        this.updateResetButton();
                         this.update();
                     });
+                });
+
+                // Add preset handler
+                document.getElementById('presets').addEventListener('change', (e) => {
+                    this.loadPreset(e.target.value);
                 });
 
                 // Add reset button handler
@@ -729,6 +762,7 @@
                 });
 
                 this.updateConstraints();
+                this.updateResetButton();
             }
 
             saveSettings() {
@@ -771,35 +805,227 @@
             }
 
             resetSettings() {
-                // Reset all controls to their default values
-                const defaults = {
-                    cellAlgorithm: 'row-major',
-                    chunkAlgorithm: 'row-major',
-                    sizeX: '16',
-                    sizeY: '16',
-                    sizeZ: '1',
-                    chunkX: '4',
-                    chunkY: '4',
-                    chunkZ: '1',
-                    queryX1: '3',
-                    queryX2: '10',
-                    queryY1: '3',
-                    queryY2: '10',
-                    queryZ1: '0',
-                    queryZ2: '0'
-                };
+                const currentPreset = document.getElementById('presets').value;
+                
+                if (currentPreset === 'user') {
+                    // Reset to user defaults
+                    const defaults = {
+                        cellAlgorithm: 'row-major',
+                        chunkAlgorithm: 'row-major',
+                        sizeX: '16',
+                        sizeY: '16',
+                        sizeZ: '1',
+                        chunkX: '4',
+                        chunkY: '4',
+                        chunkZ: '1',
+                        queryX1: '3',
+                        queryX2: '10',
+                        queryY1: '3',
+                        queryY2: '10',
+                        queryZ1: '0',
+                        queryZ2: '0'
+                    };
+                    this.applySettings(defaults);
+                    this.userSettings = defaults;
+                    this.saveSettings();
+                } else {
+                    // Reset to original preset
+                    this.loadPreset(currentPreset);
+                }
+                
+                this.updateResetButton();
+            }
+            
+            updateResetButton() {
+                const currentPreset = document.getElementById('presets').value;
+                const resetButton = document.getElementById('resetButton');
+                const currentSettings = this.getCurrentSettings();
+                let defaults;
+                
+                if (currentPreset === 'user') {
+                    defaults = {
+                        cellAlgorithm: 'row-major',
+                        chunkAlgorithm: 'row-major',
+                        sizeX: '16',
+                        sizeY: '16',
+                        sizeZ: '1',
+                        chunkX: '4',
+                        chunkY: '4',
+                        chunkZ: '1',
+                        queryX1: '3',
+                        queryX2: '10',
+                        queryY1: '3',
+                        queryY2: '10',
+                        queryZ1: '0',
+                        queryZ2: '0'
+                    };
+                } else {
+                    // Get original preset settings - need to duplicate the preset definitions
+                    const presets = {
+                        'small-tiles': {
+                            cellAlgorithm: 'row-major',
+                            chunkAlgorithm: 'row-major',
+                            sizeX: '32', sizeY: '32', sizeZ: '1',
+                            chunkX: '2', chunkY: '2', chunkZ: '1',
+                            queryX1: '8', queryX2: '24', queryY1: '8', queryY2: '24',
+                            queryZ1: '0', queryZ2: '0'
+                        },
+                        'large-tiles': {
+                            cellAlgorithm: 'row-major',
+                            chunkAlgorithm: 'row-major',
+                            sizeX: '32', sizeY: '32', sizeZ: '1',
+                            chunkX: '16', chunkY: '16', chunkZ: '1',
+                            queryX1: '10', queryX2: '14', queryY1: '10', queryY2: '14',
+                            queryZ1: '0', queryZ2: '0'
+                        },
+                        'row-vs-col': {
+                            cellAlgorithm: 'col-major',
+                            chunkAlgorithm: 'row-major',
+                            sizeX: '16', sizeY: '16', sizeZ: '1',
+                            chunkX: '4', chunkY: '8', chunkZ: '1',
+                            queryX1: '2', queryX2: '6', queryY1: '4', queryY2: '12',
+                            queryZ1: '0', queryZ2: '0'
+                        },
+                        'spatial-locality': {
+                            cellAlgorithm: 'hilbert',
+                            chunkAlgorithm: 'hilbert',
+                            sizeX: '16', sizeY: '16', sizeZ: '1',
+                            chunkX: '4', chunkY: '4', chunkZ: '1',
+                            queryX1: '6', queryX2: '9', queryY1: '6', queryY2: '9',
+                            queryZ1: '0', queryZ2: '0'
+                        },
+                        'fragmentation': {
+                            cellAlgorithm: 'z-order',
+                            chunkAlgorithm: 'col-major',
+                            sizeX: '20', sizeY: '20', sizeZ: '1',
+                            chunkX: '3', chunkY: '3', chunkZ: '1',
+                            queryX1: '1', queryX2: '18', queryY1: '5', queryY2: '7',
+                            queryZ1: '0', queryZ2: '0'
+                        },
+                        'perfect-alignment': {
+                            cellAlgorithm: 'row-major',
+                            chunkAlgorithm: 'row-major',
+                            sizeX: '16', sizeY: '16', sizeZ: '1',
+                            chunkX: '4', chunkY: '4', chunkZ: '1',
+                            queryX1: '4', queryX2: '7', queryY1: '4', queryY2: '7',
+                            queryZ1: '0', queryZ2: '0'
+                        }
+                    };
+                    defaults = presets[currentPreset];
+                }
+                
+                // Enable/disable button based on whether settings match defaults
+                const isChanged = defaults && Object.keys(defaults).some(key => 
+                    currentSettings[key] !== defaults[key]
+                );
+                
+                resetButton.disabled = !isChanged;
+                resetButton.style.opacity = isChanged ? '1' : '0.5';
+            }
 
-                Object.keys(defaults).forEach(key => {
+
+            getCurrentSettings() {
+                return {
+                    cellAlgorithm: document.getElementById('cellAlgorithm').value,
+                    chunkAlgorithm: document.getElementById('chunkAlgorithm').value,
+                    sizeX: document.getElementById('sizeX').value,
+                    sizeY: document.getElementById('sizeY').value,
+                    sizeZ: document.getElementById('sizeZ').value,
+                    chunkX: document.getElementById('chunkX').value,
+                    chunkY: document.getElementById('chunkY').value,
+                    chunkZ: document.getElementById('chunkZ').value,
+                    queryX1: document.getElementById('queryX1').value,
+                    queryX2: document.getElementById('queryX2').value,
+                    queryY1: document.getElementById('queryY1').value,
+                    queryY2: document.getElementById('queryY2').value,
+                    queryZ1: document.getElementById('queryZ1').value,
+                    queryZ2: document.getElementById('queryZ2').value
+                };
+            }
+
+            applySettings(settings) {
+                this.isLoadingPreset = true;
+                
+                Object.keys(settings).forEach(key => {
                     const element = document.getElementById(key);
                     if (element) {
-                        element.value = defaults[key];
+                        element.value = settings[key];
                     }
                 });
-
-                // Update constraints, save settings, and refresh visualization
+                
+                this.isLoadingPreset = false;
                 this.updateConstraints();
-                this.saveSettings();
+                this.updateResetButton();
                 this.update();
+            }
+
+            loadPreset(presetName) {
+                if (presetName === 'user') {
+                    if (this.userSettings) {
+                        this.applySettings(this.userSettings);
+                    }
+                    return;
+                }
+
+                // Save current settings as user settings if not already saved
+                if (!this.userSettings) {
+                    this.userSettings = this.getCurrentSettings();
+                }
+
+                const presets = {
+                    'small-tiles': {
+                        cellAlgorithm: 'row-major',
+                        chunkAlgorithm: 'row-major',
+                        sizeX: '32', sizeY: '32', sizeZ: '1',
+                        chunkX: '2', chunkY: '2', chunkZ: '1',
+                        queryX1: '8', queryX2: '24', queryY1: '8', queryY2: '24',
+                        queryZ1: '0', queryZ2: '0'
+                    },
+                    'large-tiles': {
+                        cellAlgorithm: 'row-major',
+                        chunkAlgorithm: 'row-major',
+                        sizeX: '32', sizeY: '32', sizeZ: '1',
+                        chunkX: '16', chunkY: '16', chunkZ: '1',
+                        queryX1: '10', queryX2: '14', queryY1: '10', queryY2: '14',
+                        queryZ1: '0', queryZ2: '0'
+                    },
+                    'row-vs-col': {
+                        cellAlgorithm: 'col-major',
+                        chunkAlgorithm: 'row-major',
+                        sizeX: '16', sizeY: '16', sizeZ: '1',
+                        chunkX: '4', chunkY: '8', chunkZ: '1',
+                        queryX1: '2', queryX2: '6', queryY1: '4', queryY2: '12',
+                        queryZ1: '0', queryZ2: '0'
+                    },
+                    'spatial-locality': {
+                        cellAlgorithm: 'hilbert',
+                        chunkAlgorithm: 'hilbert',
+                        sizeX: '16', sizeY: '16', sizeZ: '1',
+                        chunkX: '4', chunkY: '4', chunkZ: '1',
+                        queryX1: '6', queryX2: '9', queryY1: '6', queryY2: '9',
+                        queryZ1: '0', queryZ2: '0'
+                    },
+                    'fragmentation': {
+                        cellAlgorithm: 'z-order',
+                        chunkAlgorithm: 'col-major',
+                        sizeX: '20', sizeY: '20', sizeZ: '1',
+                        chunkX: '3', chunkY: '3', chunkZ: '1',
+                        queryX1: '1', queryX2: '18', queryY1: '5', queryY2: '7',
+                        queryZ1: '0', queryZ2: '0'
+                    },
+                    'perfect-alignment': {
+                        cellAlgorithm: 'row-major',
+                        chunkAlgorithm: 'row-major',
+                        sizeX: '16', sizeY: '16', sizeZ: '1',
+                        chunkX: '4', chunkY: '4', chunkZ: '1',
+                        queryX1: '4', queryX2: '7', queryY1: '4', queryY2: '7',
+                        queryZ1: '0', queryZ2: '0'
+                    }
+                };
+
+                if (presets[presetName]) {
+                    this.applySettings(presets[presetName]);
+                }
             }
 
             updateConstraints() {
@@ -2140,15 +2366,10 @@
                 const [sizeX, sizeY] = params.size;
                 const queryWidth = Math.abs(params.query.x[1] - params.query.x[0]) + 1;
                 const queryHeight = Math.abs(params.query.y[1] - params.query.y[0]) + 1;
-                const totalCells = sizeX * sizeY;
-                const queryCells = queryWidth * queryHeight;
-                const queryCoverage = (queryCells / totalCells) * 100;
-
                 const amplification = data.actualCells.size / Math.max(1, data.requestedCells.size);
                 const coalescingFactor = data.touchedChunks.size / Math.max(1, data.chunkedRanges.length);
+                const storageAlignment = 2 / (amplification + coalescingFactor);
 
-                document.getElementById('query-coverage').innerHTML =
-                    queryCoverage.toFixed(1) + '<span class="metric-suffix">%</span>';
                 document.getElementById('requested-cells').textContent = data.requestedCells.size;
                 document.getElementById('actual-cells').textContent = data.actualCells.size;
                 document.getElementById('amplification').innerHTML =
@@ -2159,6 +2380,7 @@
                     (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
                 document.getElementById('coalescing-factor').innerHTML =
                     coalescingFactor.toFixed(1) + '<span class="metric-suffix">x</span>';
+                document.getElementById('storage-alignment').textContent = storageAlignment.toFixed(2);
             }
         }
 
