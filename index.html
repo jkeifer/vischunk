@@ -748,6 +748,76 @@
     </div>
 
     <script>
+        // Shared preset configurations
+        const PRESET_CONFIGS = {
+            'small-tiles': {
+                cellAlgorithm: 'row-major',
+                chunkAlgorithm: 'row-major',
+                sizeX: '32', sizeY: '32', sizeZ: '1',
+                chunkX: '2', chunkY: '2', chunkZ: '1',
+                queryX1: '8', queryX2: '24', queryY1: '8', queryY2: '24',
+                queryZ1: '0', queryZ2: '0'
+            },
+            'large-tiles': {
+                cellAlgorithm: 'row-major',
+                chunkAlgorithm: 'row-major',
+                sizeX: '32', sizeY: '32', sizeZ: '1',
+                chunkX: '16', chunkY: '16', chunkZ: '1',
+                queryX1: '10', queryX2: '14', queryY1: '10', queryY2: '14',
+                queryZ1: '0', queryZ2: '0'
+            },
+            'row-vs-col': {
+                cellAlgorithm: 'col-major',
+                chunkAlgorithm: 'row-major',
+                sizeX: '16', sizeY: '16', sizeZ: '1',
+                chunkX: '4', chunkY: '8', chunkZ: '1',
+                queryX1: '2', queryX2: '6', queryY1: '4', queryY2: '12',
+                queryZ1: '0', queryZ2: '0'
+            },
+            'spatial-locality': {
+                cellAlgorithm: 'hilbert',
+                chunkAlgorithm: 'hilbert',
+                sizeX: '16', sizeY: '16', sizeZ: '1',
+                chunkX: '4', chunkY: '4', chunkZ: '1',
+                queryX1: '6', queryX2: '9', queryY1: '6', queryY2: '9',
+                queryZ1: '0', queryZ2: '0'
+            },
+            'fragmentation': {
+                cellAlgorithm: 'z-order',
+                chunkAlgorithm: 'col-major',
+                sizeX: '20', sizeY: '20', sizeZ: '1',
+                chunkX: '3', chunkY: '3', chunkZ: '1',
+                queryX1: '1', queryX2: '18', queryY1: '5', queryY2: '7',
+                queryZ1: '0', queryZ2: '0'
+            },
+            'perfect-alignment': {
+                cellAlgorithm: 'row-major',
+                chunkAlgorithm: 'row-major',
+                sizeX: '16', sizeY: '16', sizeZ: '1',
+                chunkX: '4', chunkY: '4', chunkZ: '1',
+                queryX1: '4', queryX2: '7', queryY1: '4', queryY2: '7',
+                queryZ1: '0', queryZ2: '0'
+            }
+        };
+
+        // Default user settings
+        const DEFAULT_USER_SETTINGS = {
+            cellAlgorithm: 'row-major',
+            chunkAlgorithm: 'row-major',
+            sizeX: '16',
+            sizeY: '16',
+            sizeZ: '1',
+            chunkX: '4',
+            chunkY: '4',
+            chunkZ: '1',
+            queryX1: '3',
+            queryX2: '10',
+            queryY1: '3',
+            queryY2: '10',
+            queryZ1: '0',
+            queryZ2: '0'
+        };
+
         class DataVisualizer {
             constructor() {
                 this.hoveredCell = null;
@@ -843,24 +913,8 @@
                 
                 if (currentPreset === 'user') {
                     // Reset to user defaults
-                    const defaults = {
-                        cellAlgorithm: 'row-major',
-                        chunkAlgorithm: 'row-major',
-                        sizeX: '16',
-                        sizeY: '16',
-                        sizeZ: '1',
-                        chunkX: '4',
-                        chunkY: '4',
-                        chunkZ: '1',
-                        queryX1: '3',
-                        queryX2: '10',
-                        queryY1: '3',
-                        queryY2: '10',
-                        queryZ1: '0',
-                        queryZ2: '0'
-                    };
-                    this.applySettings(defaults);
-                    this.userSettings = defaults;
+                    this.applySettings(DEFAULT_USER_SETTINGS);
+                    this.userSettings = { ...DEFAULT_USER_SETTINGS };
                     this.saveSettings();
                 } else {
                     // Reset to original preset
@@ -877,75 +931,9 @@
                 let defaults;
                 
                 if (currentPreset === 'user') {
-                    defaults = {
-                        cellAlgorithm: 'row-major',
-                        chunkAlgorithm: 'row-major',
-                        sizeX: '16',
-                        sizeY: '16',
-                        sizeZ: '1',
-                        chunkX: '4',
-                        chunkY: '4',
-                        chunkZ: '1',
-                        queryX1: '3',
-                        queryX2: '10',
-                        queryY1: '3',
-                        queryY2: '10',
-                        queryZ1: '0',
-                        queryZ2: '0'
-                    };
+                    defaults = DEFAULT_USER_SETTINGS;
                 } else {
-                    // Get original preset settings - need to duplicate the preset definitions
-                    const presets = {
-                        'small-tiles': {
-                            cellAlgorithm: 'row-major',
-                            chunkAlgorithm: 'row-major',
-                            sizeX: '32', sizeY: '32', sizeZ: '1',
-                            chunkX: '2', chunkY: '2', chunkZ: '1',
-                            queryX1: '8', queryX2: '24', queryY1: '8', queryY2: '24',
-                            queryZ1: '0', queryZ2: '0'
-                        },
-                        'large-tiles': {
-                            cellAlgorithm: 'row-major',
-                            chunkAlgorithm: 'row-major',
-                            sizeX: '32', sizeY: '32', sizeZ: '1',
-                            chunkX: '16', chunkY: '16', chunkZ: '1',
-                            queryX1: '10', queryX2: '14', queryY1: '10', queryY2: '14',
-                            queryZ1: '0', queryZ2: '0'
-                        },
-                        'row-vs-col': {
-                            cellAlgorithm: 'col-major',
-                            chunkAlgorithm: 'row-major',
-                            sizeX: '16', sizeY: '16', sizeZ: '1',
-                            chunkX: '4', chunkY: '8', chunkZ: '1',
-                            queryX1: '2', queryX2: '6', queryY1: '4', queryY2: '12',
-                            queryZ1: '0', queryZ2: '0'
-                        },
-                        'spatial-locality': {
-                            cellAlgorithm: 'hilbert',
-                            chunkAlgorithm: 'hilbert',
-                            sizeX: '16', sizeY: '16', sizeZ: '1',
-                            chunkX: '4', chunkY: '4', chunkZ: '1',
-                            queryX1: '6', queryX2: '9', queryY1: '6', queryY2: '9',
-                            queryZ1: '0', queryZ2: '0'
-                        },
-                        'fragmentation': {
-                            cellAlgorithm: 'z-order',
-                            chunkAlgorithm: 'col-major',
-                            sizeX: '20', sizeY: '20', sizeZ: '1',
-                            chunkX: '3', chunkY: '3', chunkZ: '1',
-                            queryX1: '1', queryX2: '18', queryY1: '5', queryY2: '7',
-                            queryZ1: '0', queryZ2: '0'
-                        },
-                        'perfect-alignment': {
-                            cellAlgorithm: 'row-major',
-                            chunkAlgorithm: 'row-major',
-                            sizeX: '16', sizeY: '16', sizeZ: '1',
-                            chunkX: '4', chunkY: '4', chunkZ: '1',
-                            queryX1: '4', queryX2: '7', queryY1: '4', queryY2: '7',
-                            queryZ1: '0', queryZ2: '0'
-                        }
-                    };
-                    defaults = presets[currentPreset];
+                    defaults = PRESET_CONFIGS[currentPreset];
                 }
                 
                 // Enable/disable button based on whether settings match defaults
@@ -1006,59 +994,8 @@
                     this.userSettings = this.getCurrentSettings();
                 }
 
-                const presets = {
-                    'small-tiles': {
-                        cellAlgorithm: 'row-major',
-                        chunkAlgorithm: 'row-major',
-                        sizeX: '32', sizeY: '32', sizeZ: '1',
-                        chunkX: '2', chunkY: '2', chunkZ: '1',
-                        queryX1: '8', queryX2: '24', queryY1: '8', queryY2: '24',
-                        queryZ1: '0', queryZ2: '0'
-                    },
-                    'large-tiles': {
-                        cellAlgorithm: 'row-major',
-                        chunkAlgorithm: 'row-major',
-                        sizeX: '32', sizeY: '32', sizeZ: '1',
-                        chunkX: '16', chunkY: '16', chunkZ: '1',
-                        queryX1: '10', queryX2: '14', queryY1: '10', queryY2: '14',
-                        queryZ1: '0', queryZ2: '0'
-                    },
-                    'row-vs-col': {
-                        cellAlgorithm: 'col-major',
-                        chunkAlgorithm: 'row-major',
-                        sizeX: '16', sizeY: '16', sizeZ: '1',
-                        chunkX: '4', chunkY: '8', chunkZ: '1',
-                        queryX1: '2', queryX2: '6', queryY1: '4', queryY2: '12',
-                        queryZ1: '0', queryZ2: '0'
-                    },
-                    'spatial-locality': {
-                        cellAlgorithm: 'hilbert',
-                        chunkAlgorithm: 'hilbert',
-                        sizeX: '16', sizeY: '16', sizeZ: '1',
-                        chunkX: '4', chunkY: '4', chunkZ: '1',
-                        queryX1: '6', queryX2: '9', queryY1: '6', queryY2: '9',
-                        queryZ1: '0', queryZ2: '0'
-                    },
-                    'fragmentation': {
-                        cellAlgorithm: 'z-order',
-                        chunkAlgorithm: 'col-major',
-                        sizeX: '20', sizeY: '20', sizeZ: '1',
-                        chunkX: '3', chunkY: '3', chunkZ: '1',
-                        queryX1: '1', queryX2: '18', queryY1: '5', queryY2: '7',
-                        queryZ1: '0', queryZ2: '0'
-                    },
-                    'perfect-alignment': {
-                        cellAlgorithm: 'row-major',
-                        chunkAlgorithm: 'row-major',
-                        sizeX: '16', sizeY: '16', sizeZ: '1',
-                        chunkX: '4', chunkY: '4', chunkZ: '1',
-                        queryX1: '4', queryX2: '7', queryY1: '4', queryY2: '7',
-                        queryZ1: '0', queryZ2: '0'
-                    }
-                };
-
-                if (presets[presetName]) {
-                    this.applySettings(presets[presetName]);
+                if (PRESET_CONFIGS[presetName]) {
+                    this.applySettings(PRESET_CONFIGS[presetName]);
                 }
             }
 
