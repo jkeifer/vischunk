@@ -43,7 +43,7 @@
             gap: 20px;
             margin-bottom: 30px;
         }
-        
+
         .control-section {
             padding: 20px;
             background: rgba(255, 255, 255, 0.05);
@@ -53,7 +53,7 @@
             flex-direction: column;
             gap: 15px;
         }
-        
+
         .section-title {
             font-weight: 600;
             color: #fff;
@@ -309,6 +309,12 @@
             background: linear-gradient(90deg, #00ff00, #ff0000);
         }
 
+        /* Hide Z dimension controls for now */
+        .z-control {
+            display: none !important;
+            /*display: flex !important;*/
+        }
+
         .legend {
             display: flex;
             gap: 20px;
@@ -351,9 +357,9 @@
                     <input type="number" id="sizeY" min="1" max="32" value="16">
                 </div>
 
-                <div class="control-group" id="arraySizeZGroup" style="display: none;">
+                <div class="control-group z-control" id="arraySizeZGroup">
                     <label>Array Size Z</label>
-                    <input type="number" id="sizeZ" min="0" max="16" value="0">
+                    <input type="number" id="sizeZ" min="1" max="16" value="1">
                 </div>
 
                 <div class="control-group">
@@ -379,7 +385,7 @@
                     <input type="number" id="chunkY" min="1" max="32" value="4">
                 </div>
 
-                <div class="control-group" id="chunkZGroup">
+                <div class="control-group z-control" id="chunkZGroup">
                     <label>Chunk Size Z</label>
                     <input type="number" id="chunkZ" min="1" max="32" value="1">
                 </div>
@@ -409,7 +415,7 @@
                     <span>to</span>
                     <input type="number" id="queryY2" min="0" value="10">
                 </div>
-                <div class="range-group" id="zRange" style="display: none;">
+                <div class="range-group z-control" id="zRange">
                     <label>Z:</label>
                     <input type="number" id="queryZ1" min="0" value="0">
                     <span>to</span>
@@ -502,65 +508,65 @@
 
     <div class="explanation">
         <h2>How to Interpret the Visualizations</h2>
-        
+
         <div class="explanation-content">
             <div class="explanation-section">
                 <h3>Color Coding</h3>
                 <p><span class="color-example gradient-example"></span><strong>Green to Red Gradient:</strong> Shows the linearization order from first (green) to last (red) in memory. This helps you understand how different algorithms arrange data sequentially.</p>
-                
+
                 <p><span class="color-example highlight-blue"></span><strong>Blue Highlights:</strong> Indicate query regions and all cells that need to be read to satisfy the query. This includes both requested cells and extra cells read due to chunking.</p>
-                
+
                 <p><span class="color-example highlight-white"></span><strong>White Overlays:</strong> Show currently hovered elements. Direct hovers have both overlay and outline, while cross-highlighted elements show only the overlay.</p>
             </div>
 
             <div class="explanation-section">
                 <h3>Array Views (Top Row)</h3>
                 <p><strong>Left - Logical Array:</strong> Shows how individual cells are organized and linearized within chunks. Each cell's color represents its position in the combined linearization order.</p>
-                
+
                 <p><strong>Right - Chunked Array:</strong> Displays chunk-level organization where all cells in the same chunk share the same color. This shows how chunks are linearized relative to each other.</p>
-                
+
                 <p><strong>Interactive Cross-highlighting:</strong> Hovering in one view highlights corresponding elements in all other views, helping you trace relationships between logical and physical layouts.</p>
             </div>
 
             <div class="explanation-section">
                 <h3>Linear Storage Views (Bottom Row)</h3>
                 <p><strong>Top Linear View:</strong> Shows how data is actually stored in linear memory, with the same cell-level coloring as the logical array. Blue regions indicate cells that need to be read.</p>
-                
+
                 <p><strong>Bottom Linear View:</strong> Same linear layout but colored by chunks to show how chunking affects the distribution of read operations. Blue bars below show the byte ranges that need to be fetched.</p>
-                
+
                 <p><strong>Byte Range Indicators:</strong> Lines below each linear view show how many separate read operations are required - fewer ranges mean better I/O performance.</p>
             </div>
 
             <div class="explanation-section">
                 <h3>Performance Metrics</h3>
                 <p><strong>Read Amplification:</strong> Shows how much extra data you read due to chunking. Values > 1.0 indicate wasted bandwidth. Lower is better.</p>
-                
+
                 <p><strong>Efficiency:</strong> Percentage of useful data in each read operation. Higher percentages indicate better performance with less wasted I/O.</p>
-                
+
                 <p><strong>Byte Ranges:</strong> Number of separate read operations needed. Fewer ranges reduce I/O overhead and improve performance.</p>
-                
+
                 <p><strong>Chunks Touched:</strong> How many chunks intersect with your query region. Fewer chunks generally mean more efficient access patterns.</p>
             </div>
 
             <div class="explanation-section">
                 <h3>Algorithm Comparison</h3>
                 <p><strong>Row-Major:</strong> Best for queries that access consecutive rows. Common in C/C++ and most programming languages.</p>
-                
+
                 <p><strong>Column-Major:</strong> Optimal for column-wise access patterns. Used in Fortran, R, and some scientific computing applications.</p>
-                
+
                 <p><strong>Z-Order (Morton):</strong> Space-filling curve that preserves spatial locality well. Good for 2D range queries and spatial databases.</p>
-                
+
                 <p><strong>Hilbert Curve:</strong> Optimal space-filling curve with the best spatial locality preservation. Excellent for 2D spatial queries but more complex to compute.</p>
             </div>
 
             <div class="explanation-section">
                 <h3>Optimization Tips</h3>
                 <p><strong>Match Access Patterns:</strong> Choose linearization algorithms that align with how your application accesses data most frequently.</p>
-                
+
                 <p><strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead but may increase read amplification. Smaller chunks provide finer granularity but more management overhead.</p>
-                
+
                 <p><strong>Query Shape Matters:</strong> Square queries often work best with space-filling curves, while rectangular queries may favor row/column-major ordering.</p>
-                
+
                 <p><strong>Monitor Metrics:</strong> Use the real-time metrics to compare different configurations and find the optimal balance for your specific use case.</p>
             </div>
         </div>
@@ -596,58 +602,72 @@
                         this.update();
                     });
                 });
-                
+
                 this.updateConstraints();
             }
-            
+
             updateConstraints() {
                 const sizeX = parseInt(document.getElementById('sizeX').value) || 1;
                 const sizeY = parseInt(document.getElementById('sizeY').value) || 1;
-                const sizeZ = parseInt(document.getElementById('sizeZ').value) || 0;
-                
-                // Show/hide Z-related controls based on whether we have a 3D array
-                const chunkZGroup = document.getElementById('chunkZGroup');
-                const zRange = document.getElementById('zRange');
-                
-                if (sizeZ > 0) {
-                    chunkZGroup.style.display = 'flex';
-                    zRange.style.display = 'flex';
-                    
-                    // Update chunk size constraints for 3D
-                    document.getElementById('chunkX').max = sizeX;
-                    document.getElementById('chunkY').max = sizeY;
-                    document.getElementById('chunkZ').max = sizeZ;
-                    
-                    // Update query constraints for 3D
-                    document.getElementById('queryZ1').max = sizeZ - 1;
-                    document.getElementById('queryZ2').max = sizeZ - 1;
-                    
-                    // Clamp chunk Z if needed
-                    if (parseInt(document.getElementById('chunkZ').value) > sizeZ) {
-                        document.getElementById('chunkZ').value = sizeZ;
-                    }
-                } else {
-                    chunkZGroup.style.display = 'none';
-                    zRange.style.display = 'none';
-                    
-                    // Update chunk size constraints for 2D
-                    document.getElementById('chunkX').max = sizeX;
-                    document.getElementById('chunkY').max = sizeY;
-                    // Don't set chunkZ constraints since it's hidden
+                const sizeZ = parseInt(document.getElementById('sizeZ').value) || 1;
+
+                // Z controls are statically hidden for now
+
+                // Update all constraints
+                document.getElementById('chunkX').max = sizeX;
+                document.getElementById('chunkY').max = sizeY;
+                document.getElementById('chunkZ').max = Math.max(1, sizeZ);
+
+                document.getElementById('queryX1').max = Math.max(0, sizeX - 1);
+                document.getElementById('queryX2').max = Math.max(0, sizeX - 1);
+                document.getElementById('queryY1').max = Math.max(0, sizeY - 1);
+                document.getElementById('queryY2').max = Math.max(0, sizeY - 1);
+                document.getElementById('queryZ1').max = Math.max(0, sizeZ - 1);
+                document.getElementById('queryZ2').max = Math.max(0, sizeZ - 1);
+
+                // Clamp chunk sizes to valid ranges
+                const chunkX = document.getElementById('chunkX');
+                const chunkY = document.getElementById('chunkY');
+                const chunkZ = document.getElementById('chunkZ');
+
+                if (parseInt(chunkX.value) > sizeX) chunkX.value = sizeX;
+                if (parseInt(chunkY.value) > sizeY) chunkY.value = sizeY;
+                if (parseInt(chunkZ.value) > sizeZ) chunkZ.value = Math.max(1, sizeZ);
+
+                // Clamp query values to valid ranges
+                const queryX1 = document.getElementById('queryX1');
+                const queryX2 = document.getElementById('queryX2');
+                const queryY1 = document.getElementById('queryY1');
+                const queryY2 = document.getElementById('queryY2');
+                const queryZ1 = document.getElementById('queryZ1');
+                const queryZ2 = document.getElementById('queryZ2');
+
+                const maxX = sizeX - 1;
+                const maxY = sizeY - 1;
+                const maxZ = sizeZ - 1;
+
+                if (parseInt(queryX1.value) > maxX) queryX1.value = Math.max(0, maxX);
+                if (parseInt(queryX2.value) > maxX) queryX2.value = Math.max(0, maxX);
+                if (parseInt(queryY1.value) > maxY) queryY1.value = Math.max(0, maxY);
+                if (parseInt(queryY2.value) > maxY) queryY2.value = Math.max(0, maxY);
+                if (parseInt(queryZ1.value) > maxZ) queryZ1.value = Math.max(0, maxZ);
+                if (parseInt(queryZ2.value) > maxZ) queryZ2.value = Math.max(0, maxZ);
+
+                // Handle edge case: if array dimension is 1, set sensible defaults
+                if (sizeX === 1) {
+                    chunkX.value = 1;
+                    queryX1.value = 0;
+                    queryX2.value = 0;
                 }
-                
-                // Update X,Y query constraints (always applies)
-                document.getElementById('queryX1').max = sizeX - 1;
-                document.getElementById('queryX2').max = sizeX - 1;
-                document.getElementById('queryY1').max = sizeY - 1;
-                document.getElementById('queryY2').max = sizeY - 1;
-                
-                // Clamp current values if they exceed new constraints
-                if (parseInt(document.getElementById('chunkX').value) > sizeX) {
-                    document.getElementById('chunkX').value = sizeX;
+                if (sizeY === 1) {
+                    chunkY.value = 1;
+                    queryY1.value = 0;
+                    queryY2.value = 0;
                 }
-                if (parseInt(document.getElementById('chunkY').value) > sizeY) {
-                    document.getElementById('chunkY').value = sizeY;
+                if (sizeZ === 1) {
+                    chunkZ.value = 1;
+                    queryZ1.value = 0;
+                    queryZ2.value = 0;
                 }
             }
 
@@ -688,14 +708,14 @@
 
             resizeCanvases() {
                 let needsUpdate = false;
-                
+
                 // Spatial canvases - square aspect
                 ['spatialUnchunked', 'spatialChunked'].forEach(key => {
                     const canvas = this.canvases[key];
                     const rect = canvas.getBoundingClientRect();
                     const size = Math.min(rect.width, 400);
                     const lastSize = this.lastCanvasSize.get(key);
-                    
+
                     if (!lastSize || lastSize.width !== size || lastSize.height !== size) {
                         canvas.width = size;
                         canvas.height = size;
@@ -711,7 +731,7 @@
                     const width = rect.width;
                     const height = 120;
                     const lastSize = this.lastCanvasSize.get(key);
-                    
+
                     if (!lastSize || lastSize.width !== width || lastSize.height !== height) {
                         canvas.width = width;
                         canvas.height = height;
@@ -719,7 +739,7 @@
                         needsUpdate = true;
                     }
                 });
-                
+
                 return needsUpdate;
             }
 
@@ -797,12 +817,12 @@
                 const localY = y % chunkY;
                 const localZ = z % chunkZ;
                 const rawPos = this.linearizeCoordinate(localX, localY, localZ, chunkX, chunkY, chunkZ, params.cellAlgorithm);
-                
+
                 // For non-sequential cell algorithms, normalize to ensure contiguous chunk ranges
                 if (params.cellAlgorithm === 'z-order' || params.cellAlgorithm === 'hilbert') {
                     const cacheKey = `cell-${params.cellAlgorithm}-${chunkX}-${chunkY}-${chunkZ}`;
                     if (!this.cellPositionCache) this.cellPositionCache = new Map();
-                    
+
                     if (!this.cellPositionCache.has(cacheKey)) {
                         const allCellPositions = [];
                         for (let cz = 0; cz < Math.max(1, chunkZ); cz++) {
@@ -814,17 +834,17 @@
                             }
                         }
                         allCellPositions.sort((a, b) => a - b);
-                        
+
                         const positionMap = new Map();
                         allCellPositions.forEach((pos, seqIndex) => {
                             positionMap.set(pos, seqIndex);
                         });
                         this.cellPositionCache.set(cacheKey, positionMap);
                     }
-                    
+
                     return this.cellPositionCache.get(cacheKey).get(rawPos) || 0;
                 }
-                
+
                 return rawPos;
             }
 
@@ -844,18 +864,18 @@
             // Get the normalized chunk position (sequential order 0,1,2,3... regardless of algorithm)
             getNormalizedChunkPosition(x, y, z, params) {
                 const rawChunkPos = this.getInterChunkPosition(x, y, z, params);
-                
+
                 if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
                     // For non-sequential algorithms, normalize to get proper sequential positions
                     const [sizeX, sizeY] = params.size;
                     const [chunkX, chunkY] = params.chunk;
                     const chunksX = Math.ceil(sizeX / chunkX);
                     const chunksY = Math.ceil(sizeY / chunkY);
-                    
+
                     // Create mapping once and cache it
                     const cacheKey = `${params.chunkAlgorithm}-${chunksX}-${chunksY}`;
                     if (!this.chunkPositionCache) this.chunkPositionCache = new Map();
-                    
+
                     if (!this.chunkPositionCache.has(cacheKey)) {
                         const allChunkPositions = [];
                         for (let cy = 0; cy < chunksY; cy++) {
@@ -867,27 +887,59 @@
                             }
                         }
                         allChunkPositions.sort((a, b) => a.pos - b.pos);
-                        
+
                         const positionMap = new Map();
                         allChunkPositions.forEach((item, seqIndex) => {
                             positionMap.set(item.pos, seqIndex);
                         });
                         this.chunkPositionCache.set(cacheKey, positionMap);
                     }
-                    
+
                     return this.chunkPositionCache.get(cacheKey).get(rawChunkPos) || 0;
                 }
-                
+
                 return rawChunkPos;
             }
 
             // Get the global linearization position combining both levels
             getGlobalPosition(x, y, z, params) {
+                const [sizeX, sizeY] = params.size;
                 const [chunkX, chunkY, chunkZ] = params.chunk;
-                const cellsPerChunk = chunkX * chunkY * Math.max(1, chunkZ);
+
+                // Calculate which chunk this cell belongs to
+                const chunkCX = Math.floor(x / chunkX);
+                const chunkCY = Math.floor(y / chunkY);
+                const chunkCZ = Math.floor(z / Math.max(1, chunkZ));
+
+                // Get linearization position of chunks
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
                 const normalizedChunkPos = this.getNormalizedChunkPosition(x, y, z, params);
+
+                // Calculate how many actual cells are in chunks before this one
+                let cellsBeforeThisChunk = 0;
+                for (let i = 0; i < normalizedChunkPos; i++) {
+                    // Convert sequential chunk index back to chunk coordinates
+                    const tempChunksX = Math.ceil(sizeX / chunkX);
+                    const tempChunksY = Math.ceil(sizeY / chunkY);
+
+                    let tempCX, tempCY;
+                    // This depends on the chunk algorithm - for now assume row-major for chunk ordering
+                    tempCY = Math.floor(i / tempChunksX);
+                    tempCX = i % tempChunksX;
+
+                    // Calculate actual cells in this chunk
+                    const startX = tempCX * chunkX;
+                    const startY = tempCY * chunkY;
+                    const endX = Math.min(startX + chunkX, sizeX);
+                    const endY = Math.min(startY + chunkY, sizeY);
+                    const actualCellsInChunk = (endX - startX) * (endY - startY);
+                    cellsBeforeThisChunk += actualCellsInChunk;
+                }
+
+                // Add position within current chunk
                 const intraChunkPos = this.getIntraChunkPosition(x, y, z, params);
-                return normalizedChunkPos * cellsPerChunk + intraChunkPos;
+                return cellsBeforeThisChunk + intraChunkPos;
             }
 
             // Get the range of global positions for a chunk
@@ -895,7 +947,7 @@
                 const [sizeX, sizeY] = params.size;
                 const [chunkX, chunkY] = params.chunk;
                 const cellsPerChunk = chunkX * chunkY;
-                
+
                 const positions = [];
                 for (let dy = 0; dy < chunkY; dy++) {
                     for (let dx = 0; dx < chunkX; dx++) {
@@ -906,7 +958,7 @@
                         }
                     }
                 }
-                
+
                 if (positions.length === 0) return null;
                 return {
                     min: Math.min(...positions),
@@ -1026,7 +1078,7 @@
                         // Calculate which chunk this cell belongs to
                         const chunkCX = Math.floor(cellX / chunkX);
                         const chunkCY = Math.floor(cellY / chunkY);
-                        
+
                         this.hoveredChunk = { x: chunkCX, y: chunkCY };
                         this.hoveredCell = null; // Clear individual cell when hovering chunk view
 
@@ -1051,16 +1103,16 @@
                     // Linear view interaction
                     const data = this.currentData;
                     if (!data) return;
-                    
+
                     const cellWidth = (canvas.width - 40) / data.totalCells;
                     const offsetX = 20;
                     const barHeight = 60;
                     const offsetY = 20;
-                    
+
                     // Check if mouse is over the bar area
                     if (y >= offsetY && y <= offsetY + barHeight) {
                         const cellIndex = Math.floor((x - offsetX) / cellWidth);
-                        
+
                         if (cellIndex >= 0 && cellIndex < data.totalCells) {
                             // Find which cell this linear position corresponds to
                             let foundCell = null;
@@ -1074,7 +1126,7 @@
                                 }
                                 if (foundCell) break;
                             }
-                            
+
                             if (foundCell) {
                                 if (canvasKey === 'linearUnchunked') {
                                     // Hovering cell linearization view - highlight individual cell
@@ -1083,7 +1135,7 @@
                                         x: Math.floor(foundCell.x / chunkX),
                                         y: Math.floor(foundCell.y / chunkY)
                                     };
-                                    
+
                                     const intraChunkPos = this.getIntraChunkPosition(foundCell.x, foundCell.y, 0, params);
                                     const globalPos = this.getGlobalPosition(foundCell.x, foundCell.y, 0, params);
                                     this.tooltip.style.display = 'block';
@@ -1097,7 +1149,7 @@
                                         x: Math.floor(foundCell.x / chunkX),
                                         y: Math.floor(foundCell.y / chunkY)
                                     };
-                                    
+
                                     const chunksX = Math.ceil(sizeX / chunkX);
                                     const chunkIdx = this.hoveredChunk.x + this.hoveredChunk.y * chunksX;
                                     const startX = this.hoveredChunk.x * chunkX;
@@ -1105,7 +1157,7 @@
                                     const endX = Math.min(startX + chunkX - 1, sizeX - 1);
                                     const endY = Math.min(startY + chunkY - 1, sizeY - 1);
                                     const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
-                                    
+
                                     this.tooltip.style.display = 'block';
                                     this.tooltip.style.left = `${e.clientX + 10}px`;
                                     this.tooltip.style.top = `${e.clientY - 30}px`;
@@ -1148,7 +1200,7 @@
                     JSON.stringify(this.lastParams.size) !== JSON.stringify(params.size) ||
                     JSON.stringify(this.lastParams.chunk) !== JSON.stringify(params.chunk)
                 );
-                
+
                 if (paramsChanged) {
                     this.linearizationCache.clear();
                     this.positionCache.clear();
@@ -1312,7 +1364,7 @@
                                 cellSize - 1
                             );
                         }
-                        
+
                     }
                 }
 
@@ -1334,12 +1386,12 @@
                 // Highlight all cells in hovered chunk (when hovering chunk view)
                 if (this.hoveredChunk && !this.hoveredCell) {
                     const [chunkSizeX, chunkSizeY] = params.chunk;
-                    
+
                     for (let y = 0; y < sizeY; y++) {
                         for (let x = 0; x < sizeX; x++) {
                             const cellChunkX = Math.floor(x / chunkSizeX);
                             const cellChunkY = Math.floor(y / chunkSizeY);
-                            
+
                             if (cellChunkX === this.hoveredChunk.x && cellChunkY === this.hoveredChunk.y) {
                                 // Draw semi-transparent white overlay
                                 ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
@@ -1362,57 +1414,62 @@
 
                 const [sizeX, sizeY, sizeZ] = params.size;
                 const [chunkX, chunkY] = params.chunk;
-                
+
                 // Use same sizing calculation as logical array view
                 const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
                 const offsetX = (canvas.width - sizeX * cellSize) / 2;
                 const offsetY = (canvas.height - sizeY * cellSize) / 2;
-                
+
                 // Calculate chunk dimensions
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
 
-                // Cache chunk color mapping for performance
-                const chunkMapKey = `${chunksX},${chunksY},${params.chunkAlgorithm}`;
+                // Cache chunk color mapping for performance (include Z dimension)
+                const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
+                const chunkMapKey = `${chunksX},${chunksY},${chunksZ},${params.chunkAlgorithm}`;
                 let chunkColorMap = this.positionCache.get(chunkMapKey);
-                
+
                 if (!chunkColorMap) {
-                    // First, create a mapping of chunk coordinates to their linearization order
+                    // First, create a mapping of chunk coordinates to their linearization order (including Z)
                     const chunkPositions = [];
-                    for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
-                        for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
-                            const linearPos = this.linearizeCoordinate(chunkCX, chunkCY, 0, chunksX, chunksY, 1, params.chunkAlgorithm);
-                            chunkPositions.push({
-                                chunkCX,
-                                chunkCY,
-                                linearPos
-                            });
+                    for (let chunkCZ = 0; chunkCZ < chunksZ; chunkCZ++) {
+                        for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
+                            for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
+                                const linearPos = this.linearizeCoordinate(chunkCX, chunkCY, chunkCZ, chunksX, chunksY, chunksZ, params.chunkAlgorithm);
+                                chunkPositions.push({
+                                    chunkCX,
+                                    chunkCY,
+                                    chunkCZ,
+                                    linearPos
+                                });
+                            }
                         }
                     }
-                    
+
                     // Sort chunks by their linearization position
                     chunkPositions.sort((a, b) => a.linearPos - b.linearPos);
-                    
+
                     // Create a map from chunk coordinates to color index
                     chunkColorMap = new Map();
                     chunkPositions.forEach((chunk, index) => {
-                        const key = `${chunk.chunkCX},${chunk.chunkCY}`;
+                        const key = `${chunk.chunkCX},${chunk.chunkCY},${chunk.chunkCZ}`;
                         chunkColorMap.set(key, index);
                     });
-                    
+
                     this.positionCache.set(chunkMapKey, chunkColorMap);
                 }
-                
+
                 // Now draw each cell using its chunk's color
                 for (let y = 0; y < sizeY; y++) {
                     for (let x = 0; x < sizeX; x++) {
                         const chunkCX = Math.floor(x / chunkX);
                         const chunkCY = Math.floor(y / chunkY);
-                        const chunkKey = `${chunkCX},${chunkCY}`;
+                        const chunkCZ = 0; // For 2D spatial view, we show Z=0 slice
+                        const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
                         const colorIndex = chunkColorMap.get(chunkKey);
-                        const totalChunks = chunksX * chunksY;
+                        const totalChunks = chunksX * chunksY * chunksZ;
                         const color = this.getColorForLinearPosition(colorIndex, totalChunks - 1);
-                        
+
                         ctx.fillStyle = color;
                         ctx.fillRect(
                             offsetX + x * cellSize,
@@ -1427,12 +1484,12 @@
                 if (this.hoveredCell) {
                     const hoveredChunkCX = Math.floor(this.hoveredCell.x / chunkX);
                     const hoveredChunkCY = Math.floor(this.hoveredCell.y / chunkY);
-                    
+
                     const startX = hoveredChunkCX * chunkX;
                     const startY = hoveredChunkCY * chunkY;
                     const endX = Math.min(startX + chunkX, sizeX);
                     const endY = Math.min(startY + chunkY, sizeY);
-                    
+
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                     ctx.fillRect(
                         offsetX + startX * cellSize,
@@ -1446,11 +1503,11 @@
                 if (data.touchedChunks.size > 0) {
                     ctx.strokeStyle = '#4a9eff';
                     ctx.lineWidth = 3;
-                    
+
                     // Find bounding box of all touched chunks
                     let minChunkX = Infinity, minChunkY = Infinity;
                     let maxChunkX = -Infinity, maxChunkY = -Infinity;
-                    
+
                     data.touchedChunks.forEach(chunkIdx => {
                         const chunkCY = Math.floor(chunkIdx / chunksX);
                         const chunkCX = chunkIdx % chunksX;
@@ -1459,13 +1516,13 @@
                         maxChunkX = Math.max(maxChunkX, chunkCX);
                         maxChunkY = Math.max(maxChunkY, chunkCY);
                     });
-                    
+
                     // Draw single rectangle around all touched chunks
                     const startX = minChunkX * chunkX;
                     const startY = minChunkY * chunkY;
                     const endX = Math.min((maxChunkX + 1) * chunkX, sizeX);
                     const endY = Math.min((maxChunkY + 1) * chunkY, sizeY);
-                    
+
                     ctx.strokeRect(
                         offsetX + startX * cellSize,
                         offsetY + startY * cellSize,
@@ -1478,12 +1535,12 @@
                 if (this.hoveredChunk && !this.hoveredCell) {
                     const chunkCX = this.hoveredChunk.x;
                     const chunkCY = this.hoveredChunk.y;
-                    
+
                     const startX = chunkCX * chunkX;
                     const startY = chunkCY * chunkY;
                     const endX = Math.min(startX + chunkX, sizeX);
                     const endY = Math.min(startY + chunkY, sizeY);
-                    
+
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                     ctx.fillRect(
                         offsetX + startX * cellSize,
@@ -1548,9 +1605,9 @@
                         // Background highlight for chunk range
                         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                         ctx.fillRect(
-                            offsetX + chunkRange.min * cellWidth, 
-                            offsetY, 
-                            (chunkRange.max - chunkRange.min + 1) * cellWidth, 
+                            offsetX + chunkRange.min * cellWidth,
+                            offsetY,
+                            (chunkRange.max - chunkRange.min + 1) * cellWidth,
                             barHeight
                         );
 
@@ -1559,9 +1616,9 @@
                             ctx.strokeStyle = '#fff';
                             ctx.lineWidth = 3;
                             ctx.strokeRect(
-                                offsetX + chunkRange.min * cellWidth, 
-                                offsetY, 
-                                (chunkRange.max - chunkRange.min + 1) * cellWidth, 
+                                offsetX + chunkRange.min * cellWidth,
+                                offsetY,
+                                (chunkRange.max - chunkRange.min + 1) * cellWidth,
                                 barHeight
                             );
                         }
@@ -1612,11 +1669,11 @@
                 const chunksX = Math.ceil(sizeX / chunkSizeX);
                 const chunksY = Math.ceil(sizeY / chunkSizeY);
                 const totalChunks = chunksX * chunksY;
-                
+
                 // Cache position-to-cell mapping for performance
                 const posMapKey = `${sizeX},${sizeY},${params.cellAlgorithm},${params.chunkAlgorithm},${chunkSizeX},${chunkSizeY}`;
                 let positionToCell = this.positionCache.get(posMapKey);
-                
+
                 if (!positionToCell) {
                     positionToCell = new Map();
                     for (let y = 0; y < sizeY; y++) {
@@ -1627,14 +1684,30 @@
                     }
                     this.positionCache.set(posMapKey, positionToCell);
                 }
-                
+
+                // Use the same chunk color mapping as the spatial view for consistency
+                const chunksZ3D = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
+                const chunkMapKey2 = `${chunksX},${chunksY},${chunksZ3D},${params.chunkAlgorithm}`;
+                const spatialChunkColorMap = this.positionCache.get(chunkMapKey2);
+
                 for (let i = 0; i < data.totalCells; i++) {
                     const cell = positionToCell.get(i);
-                    if (cell) {
-                        // Color based on normalized chunk position
-                        const normalizedPos = this.getNormalizedChunkPosition(cell.x, cell.y, 0, params);
-                        const color = this.getColorForLinearPosition(normalizedPos, totalChunks - 1);
-                        ctx.fillStyle = color;
+                    if (cell && spatialChunkColorMap) {
+                        // Use the same chunk color mapping as the spatial chunked view
+                        const chunkCX = Math.floor(cell.x / chunkSizeX);
+                        const chunkCY = Math.floor(cell.y / chunkSizeY);
+                        const chunkCZ = Math.floor((cell.z || 0) / Math.max(1, params.chunk[2]));
+                        const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
+                        const colorIndex = spatialChunkColorMap.get(chunkKey);
+
+                        if (colorIndex !== undefined) {
+                            const totalChunks3D = chunksX * chunksY * chunksZ3D;
+                            const color = this.getColorForLinearPosition(colorIndex, totalChunks3D - 1);
+                            ctx.fillStyle = color;
+                        } else {
+                            // Fallback for invalid chunks
+                            ctx.fillStyle = '#333';
+                        }
                     } else {
                         // Fallback to gradient if position mapping fails
                         const color = this.getColorForLinearPosition(i, data.totalCells);
@@ -1664,9 +1737,9 @@
                         // Highlight chunk range with background
                         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                         ctx.fillRect(
-                            offsetX + chunkRange.min * cellWidth, 
-                            offsetY, 
-                            (chunkRange.max - chunkRange.min + 1) * cellWidth, 
+                            offsetX + chunkRange.min * cellWidth,
+                            offsetY,
+                            (chunkRange.max - chunkRange.min + 1) * cellWidth,
                             barHeight
                         );
 
@@ -1675,9 +1748,9 @@
                             ctx.strokeStyle = '#fff';
                             ctx.lineWidth = 3;
                             ctx.strokeRect(
-                                offsetX + chunkRange.min * cellWidth, 
-                                offsetY, 
-                                (chunkRange.max - chunkRange.min + 1) * cellWidth, 
+                                offsetX + chunkRange.min * cellWidth,
+                                offsetY,
+                                (chunkRange.max - chunkRange.min + 1) * cellWidth,
                                 barHeight
                             );
                         }
