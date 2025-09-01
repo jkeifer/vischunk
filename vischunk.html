@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multidimensional Data Linearization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            min-height: 100vh;
+            padding: 20px;
+            color: #eee;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 2em;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #aaa;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 500;
+            color: #bbb;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="number"], select {
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            transition: all 0.3s;
+        }
+
+        input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: #4a9eff;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        select option {
+            background: #2a2a3e;
+            color: #fff;
+        }
+
+        .query-controls {
+            background: rgba(255, 200, 0, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 200, 0, 0.3);
+        }
+
+        .query-title {
+            font-weight: 600;
+            color: #ffc107;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+
+        .range-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .range-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            color: #ddd;
+        }
+
+        .range-group input {
+            width: 60px;
+        }
+
+        .spatial-views {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .viz-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .viz-title {
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 10px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            cursor: crosshair;
+        }
+
+        .linear-views {
+            margin-bottom: 30px;
+        }
+
+        .linear-viz {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+
+        .metric {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .metric-suffix {
+            font-size: 0.5em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multidimensional Data Linearization Visualizer</h1>
+        <p class="subtitle">Explore how chunking and linearization strategies affect read patterns</p>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Linearization</label>
+                <select id="algorithm">
+                    <option value="row-major">Row-Major</option>
+                    <option value="col-major">Column-Major</option>
+                    <option value="z-order">Z-Order (Morton)</option>
+                    <option value="hilbert">Hilbert Curve</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Array Size X</label>
+                <input type="number" id="sizeX" min="1" max="32" value="16">
+            </div>
+
+            <div class="control-group">
+                <label>Array Size Y</label>
+                <input type="number" id="sizeY" min="1" max="32" value="16">
+            </div>
+
+            <div class="control-group">
+                <label>Array Size Z</label>
+                <input type="number" id="sizeZ" min="0" max="16" value="0">
+            </div>
+
+            <div class="control-group">
+                <label>Chunk Size X</label>
+                <input type="number" id="chunkX" min="1" max="32" value="4">
+            </div>
+
+            <div class="control-group">
+                <label>Chunk Size Y</label>
+                <input type="number" id="chunkY" min="1" max="32" value="4">
+            </div>
+
+            <div class="control-group">
+                <label>Chunk Size Z</label>
+                <input type="number" id="chunkZ" min="1" max="32" value="1">
+            </div>
+        </div>
+
+        <div class="query-controls">
+            <div class="query-title">Query Region</div>
+            <div class="range-inputs">
+                <div class="range-group">
+                    <label>X:</label>
+                    <input type="number" id="queryX1" min="0" value="3">
+                    <span>to</span>
+                    <input type="number" id="queryX2" min="0" value="10">
+                </div>
+                <div class="range-group">
+                    <label>Y:</label>
+                    <input type="number" id="queryY1" min="0" value="3">
+                    <span>to</span>
+                    <input type="number" id="queryY2" min="0" value="10">
+                </div>
+                <div class="range-group" id="zRange" style="display: none;">
+                    <label>Z:</label>
+                    <input type="number" id="queryZ1" min="0" value="0">
+                    <span>to</span>
+                    <input type="number" id="queryZ2" min="0" value="0">
+                </div>
+            </div>
+        </div>
+
+        <div class="spatial-views">
+            <div class="viz-panel">
+                <div class="viz-title">Logical Array (Unchunked)</div>
+                <div class="canvas-container">
+                    <canvas id="spatial-unchunked"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);"></div>
+                        <span>Linearization Order</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="border: 3px solid #4a9eff; background: transparent;"></div>
+                        <span>Query Region</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="viz-panel">
+                <div class="viz-title">Chunked Array</div>
+                <div class="canvas-container">
+                    <canvas id="spatial-chunked"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: rgba(74, 158, 255, 0.3);"></div>
+                        <span>Chunks to Read</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="border: 2px solid #ff5722; background: transparent;"></div>
+                        <span>Chunk Boundaries</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="linear-views">
+            <div class="linear-viz">
+                <div class="viz-title">Linear Storage (Unchunked)</div>
+                <div class="canvas-container">
+                    <canvas id="linear-unchunked"></canvas>
+                </div>
+            </div>
+
+            <div class="linear-viz">
+                <div class="viz-title">Linear Storage (Chunked)</div>
+                <div class="canvas-container">
+                    <canvas id="linear-chunked"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-label">Requested Cells</div>
+                <div class="metric-value" id="requested-cells">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Actual Cells Read</div>
+                <div class="metric-value" id="actual-cells">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Read Amplification</div>
+                <div class="metric-value" id="amplification">1.0<span class="metric-suffix">x</span></div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Chunks Touched</div>
+                <div class="metric-value" id="chunks-touched">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Byte Ranges</div>
+                <div class="metric-value" id="byte-ranges">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Efficiency</div>
+                <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        class DataVisualizer {
+            constructor() {
+                this.hoveredCell = null;
+                this.hoveredChunk = null;
+                this.linearizationCache = new Map();
+                this.initializeControls();
+                this.initializeCanvases();
+                this.update();
+            }
+
+            initializeControls() {
+                const controls = ['algorithm', 'sizeX', 'sizeY', 'sizeZ',
+                                 'chunkX', 'chunkY', 'chunkZ',
+                                 'queryX1', 'queryX2', 'queryY1', 'queryY2',
+                                 'queryZ1', 'queryZ2'];
+
+                controls.forEach(id => {
+                    const element = document.getElementById(id);
+                    element.addEventListener('change', () => this.update());
+                    element.addEventListener('input', () => this.update());
+                });
+            }
+
+            initializeCanvases() {
+                this.canvases = {
+                    spatialUnchunked: document.getElementById('spatial-unchunked'),
+                    spatialChunked: document.getElementById('spatial-chunked'),
+                    linearUnchunked: document.getElementById('linear-unchunked'),
+                    linearChunked: document.getElementById('linear-chunked')
+                };
+
+                this.contexts = {};
+                for (const [key, canvas] of Object.entries(this.canvases)) {
+                    this.contexts[key] = canvas.getContext('2d');
+
+                    // Add mouse interaction for spatial views
+                    if (key.startsWith('spatial')) {
+                        canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e, key));
+                        canvas.addEventListener('mouseleave', () => this.handleMouseLeave());
+                    }
+                }
+
+                this.tooltip = document.getElementById('tooltip');
+
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+            }
+
+            resizeCanvases() {
+                // Spatial canvases - square aspect
+                ['spatialUnchunked', 'spatialChunked'].forEach(key => {
+                    const canvas = this.canvases[key];
+                    const rect = canvas.getBoundingClientRect();
+                    const size = Math.min(rect.width, 400);
+                    canvas.width = size;
+                    canvas.height = size;
+                });
+
+                // Linear canvases - full width
+                ['linearUnchunked', 'linearChunked'].forEach(key => {
+                    const canvas = this.canvases[key];
+                    const rect = canvas.getBoundingClientRect();
+                    canvas.width = rect.width;
+                    canvas.height = 120;
+                });
+            }
+
+            getParameters() {
+                return {
+                    algorithm: document.getElementById('algorithm').value,
+                    size: [
+                        parseInt(document.getElementById('sizeX').value) || 1,
+                        parseInt(document.getElementById('sizeY').value) || 1,
+                        parseInt(document.getElementById('sizeZ').value) || 0
+                    ],
+                    chunk: [
+                        parseInt(document.getElementById('chunkX').value) || 1,
+                        parseInt(document.getElementById('chunkY').value) || 1,
+                        parseInt(document.getElementById('chunkZ').value) || 1
+                    ],
+                    query: {
+                        x: [parseInt(document.getElementById('queryX1').value) || 0,
+                            parseInt(document.getElementById('queryX2').value) || 0],
+                        y: [parseInt(document.getElementById('queryY1').value) || 0,
+                            parseInt(document.getElementById('queryY2').value) || 0],
+                        z: [parseInt(document.getElementById('queryZ1').value) || 0,
+                            parseInt(document.getElementById('queryZ2').value) || 0]
+                    }
+                };
+            }
+
+            linearizeCoordinate(x, y, z, params) {
+                const key = `${x},${y},${z},${params.algorithm}`;
+                if (this.linearizationCache.has(key)) {
+                    return this.linearizationCache.get(key);
+                }
+
+                const [sizeX, sizeY, sizeZ] = params.size;
+                let result;
+
+                switch(params.algorithm) {
+                    case 'row-major':
+                        result = x + y * sizeX + z * sizeX * sizeY;
+                        break;
+
+                    case 'col-major':
+                        result = y + x * sizeY + z * sizeX * sizeY;
+                        break;
+
+                    case 'z-order':
+                        result = this.mortonEncode3D(x, y, z);
+                        break;
+
+                    case 'hilbert':
+                        if (sizeZ > 0) {
+                            // For 3D, use simple layer-based approach
+                            result = z * sizeX * sizeY + this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        } else {
+                            result = this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        }
+                        break;
+
+                    default:
+                        result = x + y * sizeX + z * sizeX * sizeY;
+                }
+
+                this.linearizationCache.set(key, result);
+                return result;
+            }
+
+            mortonEncode3D(x, y, z) {
+                let result = 0;
+                for (let i = 0; i < 10; i++) {
+                    result |= ((x & (1 << i)) << (2 * i)) |
+                              ((y & (1 << i)) << (2 * i + 1)) |
+                              ((z & (1 << i)) << (2 * i + 2));
+                }
+                return result;
+            }
+
+            hilbertEncode2D(x, y, n) {
+                let d = 0;
+                for (let s = n / 2; s > 0; s /= 2) {
+                    let rx = (x & s) > 0 ? 1 : 0;
+                    let ry = (y & s) > 0 ? 1 : 0;
+                    d += s * s * ((3 * rx) ^ ry);
+                    [x, y] = this.hilbertRotate(s, x, y, rx, ry);
+                }
+                return d;
+            }
+
+            hilbertRotate(n, x, y, rx, ry) {
+                if (ry === 0) {
+                    if (rx === 1) {
+                        x = n - 1 - x;
+                        y = n - 1 - y;
+                    }
+                    [x, y] = [y, x];
+                }
+                return [x, y];
+            }
+
+            getChunkIndex(x, y, z, params) {
+                const [chunkX, chunkY, chunkZ] = params.chunk;
+                const cx = Math.floor(x / chunkX);
+                const cy = Math.floor(y / chunkY);
+                const cz = Math.floor(z / chunkZ);
+                const [sizeX, sizeY] = params.size;
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+                return cx + cy * chunksX + cz * chunksX * chunksY;
+            }
+
+            getColorForLinearPosition(position, maxPosition) {
+                const hue = (1 - position / maxPosition) * 120; // Green to Red
+                return `hsl(${hue}, 70%, 50%)`;
+            }
+
+            handleMouseMove(e, canvasKey) {
+                const canvas = this.canvases[canvasKey];
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const params = this.getParameters();
+                const [sizeX, sizeY, sizeZ] = params.size;
+                const [chunkX, chunkY] = params.chunk;
+
+                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
+                const offsetX = (canvas.width - sizeX * cellSize) / 2;
+                const offsetY = (canvas.height - sizeY * cellSize) / 2;
+
+                const cellX = Math.floor((x - offsetX) / cellSize);
+                const cellY = Math.floor((y - offsetY) / cellSize);
+
+                if (cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY) {
+                    if (canvasKey === 'spatialUnchunked') {
+                        this.hoveredCell = { x: cellX, y: cellY };
+                        this.hoveredChunk = null;
+                    } else {
+                        this.hoveredChunk = {
+                            x: Math.floor(cellX / chunkX),
+                            y: Math.floor(cellY / chunkY)
+                        };
+                        this.hoveredCell = null;
+                    }
+
+                    // Show tooltip
+                    const linearPos = this.linearizeCoordinate(cellX, cellY, 0, params);
+                    this.tooltip.style.display = 'block';
+                    this.tooltip.style.left = `${e.clientX + 10}px`;
+                    this.tooltip.style.top = `${e.clientY - 30}px`;
+
+                    if (canvasKey === 'spatialUnchunked') {
+                        this.tooltip.textContent = `Cell (${cellX}, ${cellY}) → Linear: ${linearPos}`;
+                    } else {
+                        const chunkIdx = this.getChunkIndex(cellX, cellY, 0, params);
+                        this.tooltip.textContent = `Chunk ${chunkIdx} contains cell (${cellX}, ${cellY})`;
+                    }
+                } else {
+                    this.hoveredCell = null;
+                    this.hoveredChunk = null;
+                    this.tooltip.style.display = 'none';
+                }
+
+                this.update();
+            }
+
+            handleMouseLeave() {
+                this.hoveredCell = null;
+                this.hoveredChunk = null;
+                this.tooltip.style.display = 'none';
+                this.update();
+            }
+
+            update() {
+                const params = this.getParameters();
+
+                // Clear linearization cache if parameters changed significantly
+                if (this.lastParams && (
+                    this.lastParams.algorithm !== params.algorithm ||
+                    JSON.stringify(this.lastParams.size) !== JSON.stringify(params.size)
+                )) {
+                    this.linearizationCache.clear();
+                }
+                this.lastParams = { ...params };
+
+                // Update Z range visibility
+                document.getElementById('zRange').style.display =
+                    params.size[2] > 0 ? 'flex' : 'none';
+
+                // Calculate data
+                const data = this.calculateData(params);
+
+                // Draw all views
+                this.drawSpatialUnchunked(params, data);
+                this.drawSpatialChunked(params, data);
+                this.drawLinearUnchunked(params, data);
+                this.drawLinearChunked(params, data);
+
+                // Update metrics
+                this.updateMetrics(data);
+            }
+
+            calculateData(params) {
+                const [sizeX, sizeY, sizeZ] = params.size;
+                const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
+
+                // Calculate requested cells
+                const requestedCells = new Set();
+                const touchedChunks = new Set();
+
+                for (let x = params.query.x[0]; x <= Math.min(params.query.x[1], sizeX - 1); x++) {
+                    for (let y = params.query.y[0]; y <= Math.min(params.query.y[1], sizeY - 1); y++) {
+                        if (sizeZ > 0) {
+                            for (let z = params.query.z[0]; z <= Math.min(params.query.z[1], sizeZ - 1); z++) {
+                                requestedCells.add(`${x},${y},${z}`);
+                                touchedChunks.add(this.getChunkIndex(x, y, z, params));
+                            }
+                        } else {
+                            requestedCells.add(`${x},${y},0`);
+                            touchedChunks.add(this.getChunkIndex(x, y, 0, params));
+                        }
+                    }
+                }
+
+                // Calculate actual cells read (all cells in touched chunks)
+                const actualCells = new Set();
+                const [chunkX, chunkY, chunkZ] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+
+                touchedChunks.forEach(chunkIdx => {
+                    const cz = Math.floor(chunkIdx / (chunksX * chunksY));
+                    const cy = Math.floor((chunkIdx % (chunksX * chunksY)) / chunksX);
+                    const cx = chunkIdx % chunksX;
+
+                    for (let dx = 0; dx < chunkX; dx++) {
+                        for (let dy = 0; dy < chunkY; dy++) {
+                            for (let dz = 0; dz < (sizeZ > 0 ? chunkZ : 1); dz++) {
+                                const x = cx * chunkX + dx;
+                                const y = cy * chunkY + dy;
+                                const z = cz * chunkZ + dz;
+
+                                if (x < sizeX && y < sizeY && (sizeZ === 0 || z < sizeZ)) {
+                                    actualCells.add(`${x},${y},${z}`);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Calculate byte ranges for chunked reads
+                const chunkedRanges = this.calculateByteRanges(
+                    [...actualCells].map(key => {
+                        const [x, y, z] = key.split(',').map(Number);
+                        return this.linearizeCoordinate(x, y, z, params);
+                    })
+                );
+
+                // Calculate byte ranges for unchunked reads
+                const unchunkedRanges = this.calculateByteRanges(
+                    [...requestedCells].map(key => {
+                        const [x, y, z] = key.split(',').map(Number);
+                        return this.linearizeCoordinate(x, y, z, params);
+                    })
+                );
+
+                return {
+                    requestedCells,
+                    actualCells,
+                    touchedChunks,
+                    chunkedRanges,
+                    unchunkedRanges,
+                    totalCells
+                };
+            }
+
+            calculateByteRanges(positions) {
+                if (positions.length === 0) return [];
+
+                const sorted = [...positions].sort((a, b) => a - b);
+                const ranges = [];
+                let start = sorted[0];
+                let end = sorted[0];
+
+                for (let i = 1; i < sorted.length; i++) {
+                    if (sorted[i] === end + 1) {
+                        end = sorted[i];
+                    } else {
+                        ranges.push([start, end]);
+                        start = end = sorted[i];
+                    }
+                }
+                ranges.push([start, end]);
+                return ranges;
+            }
+
+            drawSpatialUnchunked(params, data) {
+                const ctx = this.contexts.spatialUnchunked;
+                const canvas = this.canvases.spatialUnchunked;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const [sizeX, sizeY, sizeZ] = params.size;
+                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
+                const offsetX = (canvas.width - sizeX * cellSize) / 2;
+                const offsetY = (canvas.height - sizeY * cellSize) / 2;
+
+                // Draw cells with gradient based on linearization order
+                for (let y = 0; y < sizeY; y++) {
+                    for (let x = 0; x < sizeX; x++) {
+                        const linearPos = this.linearizeCoordinate(x, y, 0, params);
+                        const color = this.getColorForLinearPosition(linearPos, data.totalCells);
+
+                        ctx.fillStyle = color;
+                        ctx.fillRect(
+                            offsetX + x * cellSize,
+                            offsetY + y * cellSize,
+                            cellSize - 1,
+                            cellSize - 1
+                        );
+
+                        // Highlight if hovered
+                        if (this.hoveredCell && this.hoveredCell.x === x && this.hoveredCell.y === y) {
+                            ctx.strokeStyle = '#fff';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(
+                                offsetX + x * cellSize,
+                                offsetY + y * cellSize,
+                                cellSize - 1,
+                                cellSize - 1
+                            );
+                        }
+                    }
+                }
+
+                // Draw query region outline
+                ctx.strokeStyle = '#4a9eff';
+                ctx.lineWidth = 3;
+                const x1 = Math.max(0, params.query.x[0]);
+                const y1 = Math.max(0, params.query.y[0]);
+                const x2 = Math.min(sizeX - 1, params.query.x[1]);
+                const y2 = Math.min(sizeY - 1, params.query.y[1]);
+
+                ctx.strokeRect(
+                    offsetX + x1 * cellSize,
+                    offsetY + y1 * cellSize,
+                    (x2 - x1 + 1) * cellSize - 1,
+                    (y2 - y1 + 1) * cellSize - 1
+                );
+            }
+
+            drawSpatialChunked(params, data) {
+                const ctx = this.contexts.spatialChunked;
+                const canvas = this.canvases.spatialChunked;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const [sizeX, sizeY, sizeZ] = params.size;
+                const [chunkX, chunkY] = params.chunk;
+                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
+                const offsetX = (canvas.width - sizeX * cellSize) / 2;
+                const offsetY = (canvas.height - sizeY * cellSize) / 2;
+
+                // Draw cells with gradient
+                for (let y = 0; y < sizeY; y++) {
+                    for (let x = 0; x < sizeX; x++) {
+                        const linearPos = this.linearizeCoordinate(x, y, 0, params);
+                        const color = this.getColorForLinearPosition(linearPos, data.totalCells);
+                        const chunkIdx = this.getChunkIndex(x, y, 0, params);
+
+                        // Dim cells not in touched chunks
+                        if (data.touchedChunks.has(chunkIdx)) {
+                            ctx.fillStyle = color;
+                        } else {
+                            // Desaturate
+                            ctx.fillStyle = color.replace('70%', '20%');
+                        }
+
+                        ctx.fillRect(
+                            offsetX + x * cellSize,
+                            offsetY + y * cellSize,
+                            cellSize - 1,
+                            cellSize - 1
+                        );
+                    }
+                }
+
+                // Highlight touched chunks
+                data.touchedChunks.forEach(chunkIdx => {
+                    const chunksX = Math.ceil(sizeX / chunkX);
+                    const cy = Math.floor(chunkIdx / chunksX);
+                    const cx = chunkIdx % chunksX;
+
+                    ctx.fillStyle = 'rgba(74, 158, 255, 0.3)';
+                    ctx.fillRect(
+                        offsetX + cx * chunkX * cellSize,
+                        offsetY + cy * chunkY * cellSize,
+                        Math.min(chunkX, sizeX - cx * chunkX) * cellSize,
+                        Math.min(chunkY, sizeY - cy * chunkY) * cellSize
+                    );
+                });
+
+                // Draw chunk boundaries
+                ctx.strokeStyle = '#ff5722';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 3]);
+
+                for (let cx = 0; cx <= sizeX; cx += chunkX) {
+                    ctx.beginPath();
+                    ctx.moveTo(offsetX + cx * cellSize, offsetY);
+                    ctx.lineTo(offsetX + cx * cellSize, offsetY + sizeY * cellSize);
+                    ctx.stroke();
+                }
+
+                for (let cy = 0; cy <= sizeY; cy += chunkY) {
+                    ctx.beginPath();
+                    ctx.moveTo(offsetX, offsetY + cy * cellSize);
+                    ctx.lineTo(offsetX + sizeX * cellSize, offsetY + cy * cellSize);
+                    ctx.stroke();
+                }
+
+                ctx.setLineDash([]);
+
+                // Highlight hovered chunk
+                if (this.hoveredChunk) {
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(
+                        offsetX + this.hoveredChunk.x * chunkX * cellSize,
+                        offsetY + this.hoveredChunk.y * chunkY * cellSize,
+                        Math.min(chunkX, sizeX - this.hoveredChunk.x * chunkX) * cellSize,
+                        Math.min(chunkY, sizeY - this.hoveredChunk.y * chunkY) * cellSize
+                    );
+                }
+            }
+
+            drawLinearUnchunked(params, data) {
+                const ctx = this.contexts.linearUnchunked;
+                const canvas = this.canvases.linearUnchunked;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const cellWidth = (canvas.width - 40) / data.totalCells;
+                const barHeight = 60;
+                const offsetX = 20;
+                const offsetY = 20;
+
+                // Draw all cells with gradient
+                for (let i = 0; i < data.totalCells; i++) {
+                    const color = this.getColorForLinearPosition(i, data.totalCells);
+                    ctx.fillStyle = color;
+                    ctx.fillRect(offsetX + i * cellWidth, offsetY, cellWidth, barHeight);
+                }
+
+                // Highlight requested cells
+                [...data.requestedCells].forEach(key => {
+                    const [x, y, z] = key.split(',').map(Number);
+                    const pos = this.linearizeCoordinate(x, y, z, params);
+                    ctx.fillStyle = 'rgba(74, 158, 255, 0.5)';
+                    ctx.fillRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
+                });
+
+                // Highlight hovered cell
+                if (this.hoveredCell) {
+                    const pos = this.linearizeCoordinate(
+                        this.hoveredCell.x,
+                        this.hoveredCell.y,
+                        0,
+                        params
+                    );
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
+                }
+
+                // Draw byte ranges
+                ctx.strokeStyle = '#4a9eff';
+                ctx.lineWidth = 2;
+                data.unchunkedRanges.forEach(([start, end]) => {
+                    const x1 = offsetX + start * cellWidth;
+                    const x2 = offsetX + (end + 1) * cellWidth;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x1, offsetY + barHeight + 5);
+                    ctx.lineTo(x2, offsetY + barHeight + 5);
+                    ctx.stroke();
+
+                    // Range markers
+                    ctx.beginPath();
+                    ctx.moveTo(x1, offsetY + barHeight);
+                    ctx.lineTo(x1, offsetY + barHeight + 10);
+                    ctx.moveTo(x2, offsetY + barHeight);
+                    ctx.lineTo(x2, offsetY + barHeight + 10);
+                    ctx.stroke();
+                });
+
+                // Labels
+                ctx.fillStyle = '#aaa';
+                ctx.font = '11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${data.unchunkedRanges.length} byte range(s)`, canvas.width / 2, offsetY + barHeight + 25);
+            }
+
+            drawLinearChunked(params, data) {
+                const ctx = this.contexts.linearChunked;
+                const canvas = this.canvases.linearChunked;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const cellWidth = (canvas.width - 40) / data.totalCells;
+                const barHeight = 60;
+                const offsetX = 20;
+                const offsetY = 20;
+
+                // Draw all cells with gradient
+                for (let i = 0; i < data.totalCells; i++) {
+                    const color = this.getColorForLinearPosition(i, data.totalCells);
+                    ctx.fillStyle = color;
+                    ctx.fillRect(offsetX + i * cellWidth, offsetY, cellWidth, barHeight);
+                }
+
+                // Highlight actual cells read (amplification)
+                [...data.actualCells].forEach(key => {
+                    const [x, y, z] = key.split(',').map(Number);
+                    const pos = this.linearizeCoordinate(x, y, z, params);
+
+                    if (data.requestedCells.has(key)) {
+                        ctx.fillStyle = 'rgba(74, 158, 255, 0.5)';
+                    } else {
+                        ctx.fillStyle = 'rgba(255, 152, 0, 0.5)';
+                    }
+                    ctx.fillRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
+                });
+
+                // Highlight hovered chunk's cells
+                if (this.hoveredChunk) {
+                    const [chunkX, chunkY] = params.chunk;
+                    const [sizeX, sizeY] = params.size;
+
+                    for (let dx = 0; dx < chunkX; dx++) {
+                        for (let dy = 0; dy < chunkY; dy++) {
+                            const x = this.hoveredChunk.x * chunkX + dx;
+                            const y = this.hoveredChunk.y * chunkY + dy;
+                            if (x < sizeX && y < sizeY) {
+                                const pos = this.linearizeCoordinate(x, y, 0, params);
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 2;
+                                ctx.strokeRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
+                            }
+                        }
+                    }
+                }
+
+                // Draw byte ranges
+                ctx.strokeStyle = '#ff5722';
+                ctx.lineWidth = 2;
+                data.chunkedRanges.forEach(([start, end]) => {
+                    const x1 = offsetX + start * cellWidth;
+                    const x2 = offsetX + (end + 1) * cellWidth;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x1, offsetY + barHeight + 5);
+                    ctx.lineTo(x2, offsetY + barHeight + 5);
+                    ctx.stroke();
+
+                    // Range markers
+                    ctx.beginPath();
+                    ctx.moveTo(x1, offsetY + barHeight);
+                    ctx.lineTo(x1, offsetY + barHeight + 10);
+                    ctx.moveTo(x2, offsetY + barHeight);
+                    ctx.lineTo(x2, offsetY + barHeight + 10);
+                    ctx.stroke();
+                });
+
+                // Labels
+                ctx.fillStyle = '#aaa';
+                ctx.font = '11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${data.chunkedRanges.length} byte range(s) with chunking`, canvas.width / 2, offsetY + barHeight + 25);
+            }
+
+            updateMetrics(data) {
+                const amplification = data.actualCells.size / Math.max(1, data.requestedCells.size);
+
+                document.getElementById('requested-cells').textContent = data.requestedCells.size;
+                document.getElementById('actual-cells').textContent = data.actualCells.size;
+                document.getElementById('amplification').innerHTML =
+                    amplification.toFixed(2) + '<span class="metric-suffix">x</span>';
+                document.getElementById('chunks-touched').textContent = data.touchedChunks.size;
+                document.getElementById('byte-ranges').textContent = data.chunkedRanges.length;
+                document.getElementById('efficiency').innerHTML =
+                    (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
+            }
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            new DataVisualizer();
+        });
+    </script>
+</body>
+</html>
