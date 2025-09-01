@@ -924,6 +924,21 @@
                 });
             }
 
+            setCanvasSize(key, width, height) {
+                const canvas = this.canvases[key];
+                const ctx = this.contexts[key];
+                const dpr = window.devicePixelRatio || 1;
+                
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
+                
+                // Reset transform before scaling to prevent accumulation
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+            }
+
             resizeCanvases() {
                 let needsUpdate = false;
 
@@ -935,8 +950,9 @@
                     const lastSize = this.lastCanvasSize.get(key);
 
                     if (!lastSize || lastSize.width !== size || lastSize.height !== size) {
-                        canvas.width = size;
-                        canvas.height = size;
+                        this.setCanvasSize(key, size, size);
+                        // Center the canvas within its container
+                        canvas.style.margin = '0 auto';
                         this.lastCanvasSize.set(key, { width: size, height: size });
                         needsUpdate = true;
                     }
@@ -951,8 +967,7 @@
                     const lastSize = this.lastCanvasSize.get(key);
 
                     if (!lastSize || lastSize.width !== width || lastSize.height !== height) {
-                        canvas.width = width;
-                        canvas.height = height;
+                        this.setCanvasSize(key, width, height);
                         this.lastCanvasSize.set(key, { width, height });
                         needsUpdate = true;
                     }
@@ -1607,12 +1622,15 @@
             drawSpatialUnchunked(params, data) {
                 const ctx = this.contexts.spatialUnchunked;
                 const canvas = this.canvases.spatialUnchunked;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
+                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
+                
+                ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 const [sizeX, sizeY, sizeZ] = params.size;
-                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                const offsetY = (canvas.height - sizeY * cellSize) / 2;
+                const cellSize = Math.min(logicalWidth / sizeX, logicalHeight / sizeY) * 0.9;
+                const offsetX = (logicalWidth - sizeX * cellSize) / 2;
+                const offsetY = (logicalHeight - sizeY * cellSize) / 2;
 
                 // Draw cells with gradient based on global linearization order
                 // Skip rendering individual cells if they're too small to see
@@ -1706,15 +1724,18 @@
             drawSpatialChunked(params, data) {
                 const ctx = this.contexts.spatialChunked;
                 const canvas = this.canvases.spatialChunked;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
+                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
+                
+                ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 const [sizeX, sizeY, sizeZ] = params.size;
                 const [chunkX, chunkY] = params.chunk;
 
                 // Use same sizing calculation as logical array view
-                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                const offsetY = (canvas.height - sizeY * cellSize) / 2;
+                const cellSize = Math.min(logicalWidth / sizeX, logicalHeight / sizeY) * 0.9;
+                const offsetX = (logicalWidth - sizeX * cellSize) / 2;
+                const offsetY = (logicalHeight - sizeY * cellSize) / 2;
 
                 // Calculate chunk dimensions
                 const chunksX = Math.ceil(sizeX / chunkX);
@@ -1755,23 +1776,40 @@
                     this.positionCache.set(chunkMapKey, chunkColorMap);
                 }
 
-                // Now draw each cell using its chunk's color
-                for (let y = 0; y < sizeY; y++) {
-                    for (let x = 0; x < sizeX; x++) {
-                        const chunkCX = Math.floor(x / chunkX);
-                        const chunkCY = Math.floor(y / chunkY);
+                // Draw each chunk as a solid rectangle
+                for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
+                    for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
                         const chunkCZ = 0; // For 2D spatial view, we show Z=0 slice
                         const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
                         const colorIndex = chunkColorMap.get(chunkKey);
                         const totalChunks = chunksX * chunksY * chunksZ;
                         const color = this.getColorForLinearPosition(colorIndex, totalChunks - 1);
 
+                        // Calculate chunk boundaries
+                        const startX = chunkCX * chunkX;
+                        const startY = chunkCY * chunkY;
+                        const endX = Math.min(startX + chunkX, sizeX);
+                        const endY = Math.min(startY + chunkY, sizeY);
+                        
+                        const chunkPixelWidth = (endX - startX) * cellSize;
+                        const chunkPixelHeight = (endY - startY) * cellSize;
+
                         ctx.fillStyle = color;
                         ctx.fillRect(
-                            offsetX + x * cellSize,
-                            offsetY + y * cellSize,
-                            cellSize - 1,
-                            cellSize - 1
+                            offsetX + startX * cellSize,
+                            offsetY + startY * cellSize,
+                            chunkPixelWidth,
+                            chunkPixelHeight
+                        );
+                        
+                        // Draw chunk border
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(
+                            offsetX + startX * cellSize,
+                            offsetY + startY * cellSize,
+                            chunkPixelWidth,
+                            chunkPixelHeight
                         );
                     }
                 }
@@ -1859,9 +1897,12 @@
             drawLinearUnchunked(params, data) {
                 const ctx = this.contexts.linearUnchunked;
                 const canvas = this.canvases.linearUnchunked;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
+                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
+                
+                ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-                const cellWidth = (canvas.width - 40) / data.totalCells;
+                const cellWidth = (logicalWidth - 40) / data.totalCells;
                 const barHeight = 60;
                 const offsetX = 20;
                 const offsetY = 20;
@@ -1956,21 +1997,24 @@
                 ctx.fillStyle = '#aaa';
                 ctx.font = '11px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${data.unchunkedRanges.length} byte range(s)`, canvas.width / 2, offsetY + barHeight + 25);
+                ctx.fillText(`${data.unchunkedRanges.length} byte range(s)`, logicalWidth / 2, offsetY + barHeight + 25);
             }
 
             drawLinearChunked(params, data) {
                 const ctx = this.contexts.linearChunked;
                 const canvas = this.canvases.linearChunked;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
+                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
+                
+                ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-                const cellWidth = (canvas.width - 40) / data.totalCells;
+                const cellWidth = (logicalWidth - 40) / data.totalCells;
                 const barHeight = 60;
                 const offsetX = 20;
                 const offsetY = 20;
 
                 // Draw all cells colored by their chunk
-                const [sizeX, sizeY] = params.size;
+                const [sizeX, sizeY, sizeZ] = params.size;
                 const [chunkSizeX, chunkSizeY] = params.chunk;
                 const chunksX = Math.ceil(sizeX / chunkSizeX);
                 const chunksY = Math.ceil(sizeY / chunkSizeY);
@@ -2088,7 +2132,7 @@
                 ctx.fillStyle = '#aaa';
                 ctx.font = '11px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${data.chunkedRanges.length} byte range(s) with chunking`, canvas.width / 2, offsetY + barHeight + 25);
+                ctx.fillText(`${data.chunkedRanges.length} byte range(s) with chunking`, logicalWidth / 2, offsetY + barHeight + 25);
             }
 
             updateMetrics(data) {
