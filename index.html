@@ -742,6 +742,14 @@
     </div>
 
     <script>
+        // Configuration constants
+        const CONFIG = {
+            MAX_CANVAS_SIZE: 400,      // Maximum canvas size in pixels
+            MIN_CELL_SIZE: 2,          // Minimum cell size for drawing details
+            MAX_CACHE_SIZE: 10000,     // Maximum entries in color cache before clearing
+            RESIZE_DEBOUNCE_MS: 150    // Debounce timeout for resize events
+        };
+
         const PRESET_CONFIGS = {
             'small-tiles': {
                 name: 'Small Tiles vs Large Query',
@@ -1215,7 +1223,7 @@
                             // Even if canvases don't need update, headers might need realignment
                             this.alignGridHeaders();
                         }
-                    }, 150);
+                    }, CONFIG.RESIZE_DEBOUNCE_MS);
                 });
             }
 
@@ -1241,7 +1249,7 @@
                 ['spatialUnchunked', 'spatialChunked'].forEach(key => {
                     const canvas = this.canvases[key];
                     const rect = canvas.getBoundingClientRect();
-                    const size = Math.min(rect.width, 400);
+                    const size = Math.min(rect.width, CONFIG.MAX_CANVAS_SIZE);
                     const lastSize = this.lastCanvasSize.get(key);
 
                     if (!lastSize || lastSize.width !== size || lastSize.height !== size) {
@@ -1556,7 +1564,7 @@
                 const color = `hsl(${hue}, 70%, 50%)`;
 
                 // Limit cache size to prevent memory leaks
-                if (this.colorCache.size > 10000) {
+                if (this.colorCache.size > CONFIG.MAX_CACHE_SIZE) {
                     this.colorCache.clear();
                 }
                 this.colorCache.set(key, color);
@@ -1909,7 +1917,7 @@
 
                 // Draw cells with gradient based on global linearization order
                 // Skip rendering individual cells if they're too small to see
-                if (cellSize > 2) {
+                if (cellSize > CONFIG.MIN_CELL_SIZE) {
                     for (let y = 0; y < sizeY; y++) {
                         for (let x = 0; x < sizeX; x++) {
                             const globalPos = this.getGlobalPosition(x, y, 0, params);
@@ -1934,7 +1942,7 @@
                 }
 
                 // Handle cell highlighting for visible cells
-                if (cellSize > 2 && this.hoveredCell) {
+                if (cellSize > CONFIG.MIN_CELL_SIZE && this.hoveredCell) {
                     const x = this.hoveredCell.x;
                     const y = this.hoveredCell.y;
 
