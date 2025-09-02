@@ -1770,9 +1770,9 @@
                         const intraChunkPos = this.getIntraChunkPosition(cellX, cellY, 0, params);
                         const globalPos = this.getGlobalPosition(cellX, cellY, 0, params);
                         this.tooltip.style.display = 'block';
-                        this.tooltip.style.position = 'fixed';
-                        this.tooltip.style.left = `${e.clientX + 10}px`;
-                        this.tooltip.style.top = `${e.clientY - 30}px`;
+                        this.tooltip.style.position = 'absolute';
+                        this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
+                        this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
                         this.tooltip.style.transform = 'none';
                         this.tooltip.style.margin = '0';
                         this.tooltip.textContent = `Cell (${cellX}, ${cellY}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`;
@@ -1808,9 +1808,9 @@
                         const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
 
                         this.tooltip.style.display = 'block';
-                        this.tooltip.style.position = 'fixed';
-                        this.tooltip.style.left = `${e.clientX + 10}px`;
-                        this.tooltip.style.top = `${e.clientY - 30}px`;
+                        this.tooltip.style.position = 'absolute';
+                        this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
+                        this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
                         this.tooltip.style.transform = 'none';
                         this.tooltip.style.margin = '0';
                         this.tooltip.textContent = `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`;
