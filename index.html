@@ -908,12 +908,100 @@
             }
         };
 
-        class DataVisualizer {
+        class TooltipManager {
+            constructor(tooltipElement) {
+                this.tooltip = tooltipElement;
+            }
+
+            show(e, content) {
+                this.tooltip.style.display = 'block';
+                this.tooltip.style.position = 'absolute';
+                this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
+                this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
+                this.tooltip.style.transform = 'none';
+                this.tooltip.style.margin = '0';
+                this.tooltip.textContent = content;
+            }
+
+            hide() {
+                this.tooltip.style.display = 'none';
+            }
+
+            updateContent(content) {
+                this.tooltip.textContent = content;
+            }
+
+            updatePosition(e) {
+                if (this.tooltip.style.display === 'block') {
+                    this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
+                    this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
+                }
+            }
+        }
+
+        class SelectionState {
             constructor() {
                 this.hoveredCell = null;
                 this.hoveredChunk = null;
                 this.selectedCell = null;
                 this.selectedChunk = null;
+            }
+
+            setHoveredCell(cell) {
+                this.hoveredCell = cell;
+            }
+
+            setHoveredChunk(chunk) {
+                this.hoveredChunk = chunk;
+            }
+
+            setSelectedCell(cell) {
+                this.selectedCell = cell;
+            }
+
+            setSelectedChunk(chunk) {
+                this.selectedChunk = chunk;
+            }
+
+            clearHover() {
+                this.hoveredCell = null;
+                this.hoveredChunk = null;
+            }
+
+            clearSelection() {
+                this.selectedCell = null;
+                this.selectedChunk = null;
+            }
+
+            clearAll() {
+                this.clearHover();
+                this.clearSelection();
+            }
+
+            getEffectiveCell() {
+                return this.selectedCell || this.hoveredCell;
+            }
+
+            getEffectiveChunk() {
+                return this.selectedChunk || this.hoveredChunk;
+            }
+
+            isSelected(cell, chunk) {
+                const sameCell = cell && this.selectedCell &&
+                    cell.x === this.selectedCell.x && cell.y === this.selectedCell.y;
+                const sameChunk = chunk && this.selectedChunk &&
+                    chunk.x === this.selectedChunk.x && chunk.y === this.selectedChunk.y;
+                return sameCell || sameChunk;
+            }
+
+            hasSelection() {
+                return this.selectedCell || this.selectedChunk;
+            }
+        }
+
+        class DataVisualizer {
+            constructor() {
+                this.selectionState = new SelectionState();
                 this.lastCanvasSize = new Map();
 
                 // Initialize caches with LRU policy
@@ -929,6 +1017,72 @@
                 this.initializeCanvases();
                 this.renderUI();
                 this.update();
+            }
+
+            // Shared coordinate calculation methods
+            getCanvasCoordinates(e, canvas) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+            }
+
+            getSpatialCellCoordinates(canvasX, canvasY, canvas, params) {
+                const [sizeX, sizeY] = params.size;
+                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
+                const offsetX = (canvas.width - sizeX * cellSize) / 2;
+                const offsetY = (canvas.height - sizeY * cellSize) / 2;
+                
+                const cellX = Math.floor((canvasX - offsetX) / cellSize);
+                const cellY = Math.floor((canvasY - offsetY) / cellSize);
+                
+                return {
+                    cellX,
+                    cellY,
+                    isValid: cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY
+                };
+            }
+
+            getLinearCellCoordinates(canvasX, canvasY, canvas, data) {
+                const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
+                const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+                const cellWidth = (logicalWidth - 40) / data.totalCells;
+                const offsetX = 20;
+                const barHeight = 60;
+                const offsetY = 20;
+                
+                const dpr = window.devicePixelRatio || 1;
+                const logicalX = canvasX / dpr;
+                const logicalY = canvasY / dpr;
+                
+                const isInBar = logicalY >= offsetY && logicalY <= offsetY + barHeight;
+                const cellIndex = Math.floor((logicalX - offsetX) / cellWidth);
+                const isValidIndex = cellIndex >= 0 && cellIndex < data.totalCells;
+                
+                return {
+                    cellIndex,
+                    isValid: isInBar && isValidIndex
+                };
+            }
+
+            getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY) {
+                for (let cy = 0; cy < sizeY; cy++) {
+                    for (let cx = 0; cx < sizeX; cx++) {
+                        const globalPos = this.getGlobalPosition(cx, cy, 0, params);
+                        if (globalPos === cellIndex) {
+                            return { 
+                                x: cx, 
+                                y: cy,
+                                chunkX: Math.floor(cx / chunkX),
+                                chunkY: Math.floor(cy / chunkY)
+                            };
+                        }
+                    }
+                }
+                return null;
             }
 
             setState(newState) {
@@ -1308,7 +1462,7 @@
                     }
                 }
 
-                this.tooltip = document.getElementById('tooltip');
+                this.tooltipManager = new TooltipManager(document.getElementById('tooltip'));
 
                 // Force initial resize after DOM is ready
                 setTimeout(() => {
@@ -1350,10 +1504,9 @@
                     }
 
                     // If clicked outside all canvases, clear selection
-                    if (!clickedCanvas && (this.selectedCell || this.selectedChunk)) {
-                        this.selectedCell = null;
-                        this.selectedChunk = null;
-                        this.tooltip.style.display = 'none';
+                    if (!clickedCanvas && this.selectionState.hasSelection()) {
+                        this.selectionState.clearSelection();
+                        this.tooltipManager.hide();
                         this.update();
                     }
                 });
@@ -1756,27 +1909,17 @@
 
             // Helper methods to get the effective cell/chunk for highlighting (selected takes precedence over hovered)
             getEffectiveCell() {
-                return this.selectedCell || this.hoveredCell;
+                return this.selectionState.getEffectiveCell();
             }
 
             getEffectiveChunk() {
-                return this.selectedChunk || this.hoveredChunk;
+                return this.selectionState.getEffectiveChunk();
             }
 
-            // Helper method to show tooltip with consistent positioning
-            showTooltip(e, content) {
-                this.tooltip.style.display = 'block';
-                this.tooltip.style.position = 'absolute';
-                this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
-                this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
-                this.tooltip.style.transform = 'none';
-                this.tooltip.style.margin = '0';
-                this.tooltip.textContent = content;
-            }
 
             handleMouseMove(e, canvasKey) {
                 // Don't update anything if there's a selection - keep the selection locked
-                if (this.selectedCell || this.selectedChunk) {
+                if (this.selectionState.hasSelection()) {
                     return;
                 }
 
@@ -1788,12 +1931,8 @@
                 });
 
                 const canvas = this.canvases[canvasKey];
-                const rect = canvas.getBoundingClientRect();
-                // Scale mouse coordinates to match canvas internal dimensions
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const x = (e.clientX - rect.left) * scaleX;
-                const y = (e.clientY - rect.top) * scaleY;
+                const coords = this.getCanvasCoordinates(e, canvas);
+                const { x, y } = coords;
 
                 const params = this.getParameters();
                 const [sizeX, sizeY, sizeZ] = params.size;
@@ -1801,49 +1940,40 @@
 
                 if (canvasKey === 'spatialUnchunked') {
                     // Original cell-level interaction for unchunked view
-                    const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                    const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                    const offsetY = (canvas.height - sizeY * cellSize) / 2;
-
-                    const cellX = Math.floor((x - offsetX) / cellSize);
-                    const cellY = Math.floor((y - offsetY) / cellSize);
-
-                    if (cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY) {
+                    const spatialCoords = this.getSpatialCellCoordinates(x, y, canvas, params);
+                    
+                    if (spatialCoords.isValid) {
+                        const { cellX, cellY } = spatialCoords;
                         // Update hover state
-                        this.hoveredCell = { x: cellX, y: cellY };
+                        this.selectionState.setHoveredCell({ x: cellX, y: cellY });
                         // Also set the corresponding chunk for cross-highlighting
-                        this.hoveredChunk = {
+                        this.selectionState.setHoveredChunk({
                             x: Math.floor(cellX / chunkX),
                             y: Math.floor(cellY / chunkY)
-                        };
+                        });
 
                         // Show tooltip
                         const intraChunkPos = this.getIntraChunkPosition(cellX, cellY, 0, params);
                         const globalPos = this.getGlobalPosition(cellX, cellY, 0, params);
-                        this.showTooltip(e, `Cell (${cellX}, ${cellY}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`);
+                        this.tooltipManager.show(e, `Cell (${cellX}, ${cellY}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`);
                     } else {
                         // Clear hover state and hide tooltip
-                        this.hoveredCell = null;
-                        this.hoveredChunk = null;
-                        this.tooltip.style.display = 'none';
+                        this.selectionState.clearHover();
+                        this.tooltipManager.hide();
                     }
                 } else if (canvasKey === 'spatialChunked') {
                     // Cell-level interaction for chunked view (but highlight whole chunks)
-                    const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                    const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                    const offsetY = (canvas.height - sizeY * cellSize) / 2;
-
-                    const cellX = Math.floor((x - offsetX) / cellSize);
-                    const cellY = Math.floor((y - offsetY) / cellSize);
-
-                    if (cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY) {
+                    const spatialCoords = this.getSpatialCellCoordinates(x, y, canvas, params);
+                    
+                    if (spatialCoords.isValid) {
+                        const { cellX, cellY } = spatialCoords;
                         // Calculate which chunk this cell belongs to
                         const chunkCX = Math.floor(cellX / chunkX);
                         const chunkCY = Math.floor(cellY / chunkY);
 
                         // Update hover state
-                        this.hoveredChunk = { x: chunkCX, y: chunkCY };
-                        this.hoveredCell = null; // Clear individual cell when hovering chunk view
+                        this.selectionState.setHoveredChunk({ x: chunkCX, y: chunkCY });
+                        this.selectionState.setHoveredCell(null); // Clear individual cell when hovering chunk view
 
                         // Show tooltip
                         const chunksX = Math.ceil(sizeX / chunkX);
@@ -1854,90 +1984,55 @@
                         const endY = Math.min(startY + chunkY - 1, sizeY - 1);
                         const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
 
-                        this.showTooltip(e, `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`);
+                        this.tooltipManager.show(e, `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`);
                     } else {
-                        this.hoveredChunk = null;
-                        this.tooltip.style.display = 'none';
+                        this.selectionState.setHoveredChunk(null);
+                        this.tooltipManager.hide();
                     }
                 } else if (canvasKey.startsWith('linear')) {
                     // Linear view interaction
                     const data = this.currentData;
                     if (!data) return;
 
-                    // Use same coordinate system as the drawing functions
-                    const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
-                    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
-                    const cellWidth = (logicalWidth - 40) / data.totalCells;
-                    const offsetX = 20;
-                    const barHeight = 60;
-                    const offsetY = 20;
+                    const linearCoords = this.getLinearCellCoordinates(x, y, canvas, data);
+                    
+                    if (linearCoords.isValid) {
+                        const { cellIndex } = linearCoords;
+                        const foundCell = this.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
 
-                    // Convert scaled mouse coordinates back to logical coordinates
-                    const dpr = window.devicePixelRatio || 1;
-                    const logicalX = x / dpr;
-                    const logicalY = y / dpr;
+                        if (foundCell) {
+                            if (canvasKey === 'linearUnchunked') {
+                                // Hovering cell linearization view - highlight individual cell
+                                this.selectionState.setHoveredCell({ x: foundCell.x, y: foundCell.y });
+                                this.selectionState.setHoveredChunk({ x: foundCell.chunkX, y: foundCell.chunkY });
 
-                    // Check if mouse is over the bar area
-                    if (logicalY >= offsetY && logicalY <= offsetY + barHeight) {
-                        const cellIndex = Math.floor((logicalX - offsetX) / cellWidth);
-
-                        if (cellIndex >= 0 && cellIndex < data.totalCells) {
-                            // Find which cell this linear position corresponds to
-                            let foundCell = null;
-                            for (let cy = 0; cy < sizeY; cy++) {
-                                for (let cx = 0; cx < sizeX; cx++) {
-                                    const globalPos = this.getGlobalPosition(cx, cy, 0, params);
-                                    if (globalPos === cellIndex) {
-                                        foundCell = { x: cx, y: cy };
-                                        break;
-                                    }
-                                }
-                                if (foundCell) break;
-                            }
-
-                            if (foundCell) {
-                                if (canvasKey === 'linearUnchunked') {
-                                    // Hovering cell linearization view - highlight individual cell
-                                    // Update hover state
-                                    this.hoveredCell = foundCell;
-                                    this.hoveredChunk = {
-                                        x: Math.floor(foundCell.x / chunkX),
-                                        y: Math.floor(foundCell.y / chunkY)
-                                    };
-
-                                    const intraChunkPos = this.getIntraChunkPosition(foundCell.x, foundCell.y, 0, params);
-                                    const globalPos = this.getGlobalPosition(foundCell.x, foundCell.y, 0, params);
-                                    this.showTooltip(e, `Cell (${foundCell.x}, ${foundCell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`);
-                                } else {
-                                    // Hovering chunked linearization view - highlight chunk
-                                    this.hoveredCell = null;
-                                    this.hoveredChunk = {
-                                        x: Math.floor(foundCell.x / chunkX),
-                                        y: Math.floor(foundCell.y / chunkY)
-                                    };
-
-                                    const chunksX = Math.ceil(sizeX / chunkX);
-                                    const chunkIdx = this.hoveredChunk.x + this.hoveredChunk.y * chunksX;
-                                    const startX = this.hoveredChunk.x * chunkX;
-                                    const startY = this.hoveredChunk.y * chunkY;
-                                    const endX = Math.min(startX + chunkX - 1, sizeX - 1);
-                                    const endY = Math.min(startY + chunkY - 1, sizeY - 1);
-                                    const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
-
-                                    this.showTooltip(e, `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`);
-                                }
+                                const intraChunkPos = this.getIntraChunkPosition(foundCell.x, foundCell.y, 0, params);
+                                const globalPos = this.getGlobalPosition(foundCell.x, foundCell.y, 0, params);
+                                this.tooltipManager.show(e, `Cell (${foundCell.x}, ${foundCell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`);
                             } else {
-                                // Clear hover state and hide tooltip
-                                this.hoveredCell = null;
-                                this.hoveredChunk = null;
-                                this.tooltip.style.display = 'none';
+                                // Hovering chunked linearization view - highlight chunk
+                                this.selectionState.setHoveredCell(null);
+                                this.selectionState.setHoveredChunk({ x: foundCell.chunkX, y: foundCell.chunkY });
+
+                                const chunksX = Math.ceil(sizeX / chunkX);
+                                const chunkIdx = foundCell.chunkX + foundCell.chunkY * chunksX;
+                                const startX = foundCell.chunkX * chunkX;
+                                const startY = foundCell.chunkY * chunkY;
+                                const endX = Math.min(startX + chunkX - 1, sizeX - 1);
+                                const endY = Math.min(startY + chunkY - 1, sizeY - 1);
+                                const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
+
+                                this.tooltipManager.show(e, `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`);
                             }
                         } else {
                             // Clear hover state and hide tooltip
-                            this.hoveredCell = null;
-                            this.hoveredChunk = null;
-                            this.tooltip.style.display = 'none';
+                            this.selectionState.clearHover();
+                            this.tooltipManager.hide();
                         }
+                    } else {
+                        // Clear hover state and hide tooltip
+                        this.selectionState.clearHover();
+                        this.tooltipManager.hide();
                     }
                 }
 
@@ -1945,9 +2040,8 @@
             }
 
             handleMouseLeave() {
-                this.hoveredCell = null;
-                this.hoveredChunk = null;
-                this.tooltip.style.display = 'none';
+                this.selectionState.clearHover();
+                this.tooltipManager.hide();
                 // Use requestAnimationFrame for smoother updates
                 if (this.updatePending) return;
                 this.updatePending = true;
@@ -1960,11 +2054,8 @@
             handleMouseClick(e, canvasKey) {
                 // Use the same coordinate calculation logic as handleMouseMove
                 const canvas = this.canvases[canvasKey];
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const x = (e.clientX - rect.left) * scaleX;
-                const y = (e.clientY - rect.top) * scaleY;
+                const coords = this.getCanvasCoordinates(e, canvas);
+                const { x, y } = coords;
 
                 const params = this.getParameters();
                 const [sizeX, sizeY, sizeZ] = params.size;
@@ -1975,14 +2066,9 @@
 
                 if (canvasKey === 'spatialUnchunked') {
                     // Cell-level click for unchunked view
-                    const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                    const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                    const offsetY = (canvas.height - sizeY * cellSize) / 2;
-
-                    const cellX = Math.floor((x - offsetX) / cellSize);
-                    const cellY = Math.floor((y - offsetY) / cellSize);
-
-                    if (cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY) {
+                    const spatialCoords = this.getSpatialCellCoordinates(x, y, canvas, params);
+                    if (spatialCoords.isValid) {
+                        const { cellX, cellY } = spatialCoords;
                         clickedCell = { x: cellX, y: cellY };
                         clickedChunk = {
                             x: Math.floor(cellX / chunkX),
@@ -1991,14 +2077,9 @@
                     }
                 } else if (canvasKey === 'spatialChunked') {
                     // Chunk-level click for chunked view
-                    const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                    const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                    const offsetY = (canvas.height - sizeY * cellSize) / 2;
-
-                    const cellX = Math.floor((x - offsetX) / cellSize);
-                    const cellY = Math.floor((y - offsetY) / cellSize);
-
-                    if (cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY) {
+                    const spatialCoords = this.getSpatialCellCoordinates(x, y, canvas, params);
+                    if (spatialCoords.isValid) {
+                        const { cellX, cellY } = spatialCoords;
                         clickedChunk = {
                             x: Math.floor(cellX / chunkX),
                             y: Math.floor(cellY / chunkY)
@@ -2008,38 +2089,15 @@
                     // Linear view click
                     const data = this.currentData;
                     if (data) {
-                        const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
-                        const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
-                        const cellWidth = (logicalWidth - 40) / data.totalCells;
-                        const offsetX = 20;
-                        const barHeight = 60;
-                        const offsetY = 20;
-
-                        const dpr = window.devicePixelRatio || 1;
-                        const logicalX = x / dpr;
-                        const logicalY = y / dpr;
-
-                        if (logicalY >= offsetY && logicalY <= offsetY + barHeight) {
-                            const cellIndex = Math.floor((logicalX - offsetX) / cellWidth);
-
-                            if (cellIndex >= 0 && cellIndex < data.totalCells) {
-                                // Find which cell this linear position corresponds to
-                                for (let cy = 0; cy < sizeY; cy++) {
-                                    for (let cx = 0; cx < sizeX; cx++) {
-                                        const globalPos = this.getGlobalPosition(cx, cy, 0, params);
-                                        if (globalPos === cellIndex) {
-                                            if (canvasKey === 'linearUnchunked') {
-                                                clickedCell = { x: cx, y: cy };
-                                            }
-                                            clickedChunk = {
-                                                x: Math.floor(cx / chunkX),
-                                                y: Math.floor(cy / chunkY)
-                                            };
-                                            break;
-                                        }
-                                    }
-                                    if (clickedCell || clickedChunk) break;
+                        const linearCoords = this.getLinearCellCoordinates(x, y, canvas, data);
+                        if (linearCoords.isValid) {
+                            const { cellIndex } = linearCoords;
+                            const foundCell = this.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
+                            if (foundCell) {
+                                if (canvasKey === 'linearUnchunked') {
+                                    clickedCell = { x: foundCell.x, y: foundCell.y };
                                 }
+                                clickedChunk = { x: foundCell.chunkX, y: foundCell.chunkY };
                             }
                         }
                     }
@@ -2048,26 +2106,20 @@
                 // Handle selection logic
                 if (clickedCell || clickedChunk) {
                     // Check if clicking on already selected item to deselect
-                    const sameCell = clickedCell && this.selectedCell &&
-                        clickedCell.x === this.selectedCell.x && clickedCell.y === this.selectedCell.y;
-                    const sameChunk = clickedChunk && this.selectedChunk &&
-                        clickedChunk.x === this.selectedChunk.x && clickedChunk.y === this.selectedChunk.y;
-
-                    if (sameCell || sameChunk) {
+                    if (this.selectionState.isSelected(clickedCell, clickedChunk)) {
                         // Deselect if clicking on same item
-                        this.selectedCell = null;
-                        this.selectedChunk = null;
-                        this.tooltip.style.display = 'none';
+                        this.selectionState.clearSelection();
+                        this.tooltipManager.hide();
                     } else {
                         // Select new item
-                        this.selectedCell = clickedCell;
-                        this.selectedChunk = clickedChunk;
+                        this.selectionState.setSelectedCell(clickedCell);
+                        this.selectionState.setSelectedChunk(clickedChunk);
 
                         // Update tooltip content
                         if (clickedCell) {
                             const intraChunkPos = this.getIntraChunkPosition(clickedCell.x, clickedCell.y, 0, params);
                             const globalPos = this.getGlobalPosition(clickedCell.x, clickedCell.y, 0, params);
-                            this.tooltip.textContent = `Cell (${clickedCell.x}, ${clickedCell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`;
+                            this.tooltipManager.show(e, `Cell (${clickedCell.x}, ${clickedCell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`);
                         } else if (clickedChunk) {
                             const chunksX = Math.ceil(sizeX / chunkX);
                             const chunkIdx = clickedChunk.x + clickedChunk.y * chunksX;
@@ -2076,28 +2128,13 @@
                             const endX = Math.min(startX + chunkX - 1, sizeX - 1);
                             const endY = Math.min(startY + chunkY - 1, sizeY - 1);
                             const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
-                            this.tooltip.textContent = `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`;
+                            this.tooltipManager.show(e, `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`);
                         }
-
-                        // Show tooltip and ensure proper positioning
-                        this.tooltip.style.display = 'block';
-                        this.tooltip.style.position = 'absolute';
-                        this.tooltip.style.transform = 'none';
-                        this.tooltip.style.margin = '0';
-
-                        // Use current tooltip position if it's already visible, otherwise use click position
-                        const isTooltipVisible = this.tooltip.style.display === 'block';
-                        if (!isTooltipVisible || !this.tooltip.style.left || !this.tooltip.style.top) {
-                            this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
-                            this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
-                        }
-                        // If tooltip is already visible with position, keep its current position
                     }
                 } else {
                     // Clicked outside any item - clear selection
-                    this.selectedCell = null;
-                    this.selectedChunk = null;
-                    this.tooltip.style.display = 'none';
+                    this.selectionState.clearSelection();
+                    this.tooltipManager.hide();
                 }
 
                 this.update();
@@ -2746,7 +2783,7 @@
                         );
 
                         // Draw single outline box around entire chunk range (when hovering chunk directly)
-                        if (!this.hoveredCell) {
+                        if (!this.selectionState.hoveredCell) {
                             ctx.strokeStyle = '#fff';
                             ctx.lineWidth = 3;
                             ctx.strokeRect(
