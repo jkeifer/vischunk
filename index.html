@@ -972,14 +972,26 @@
                     const element = document.getElementById(id);
                     element.addEventListener('change', (e) => {
                         let value = e.target.type === 'number' ?
-                            parseInt(e.target.value) || 0 :
+                            parseInt(e.target.value) :
                             e.target.value;
 
-                        // Basic validation - more complex validation can be added here
+                        // Validate numeric inputs
                         if (e.target.type === 'number') {
-                            value = Math.max(0, value); // No negative values
-                            if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
-                            if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
+                            if (isNaN(value)) {
+                                console.warn(`Invalid input value: ${e.target.value}, resetting to 1`);
+                                value = 1;
+                            } else {
+                                // Apply proper constraints based on field type
+                                if (id.startsWith('size') || id.startsWith('chunk')) {
+                                    value = Math.max(1, value); // Dimensions and chunk sizes must be >= 1
+                                } else {
+                                    value = Math.max(0, value); // Query ranges can start at 0
+                                }
+
+                                // Apply upper limits
+                                if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
+                                if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
+                            }
                         }
 
                         this.setState({ [id]: value });
@@ -1348,7 +1360,7 @@
                     size: [
                         this.state.sizeX,
                         this.state.sizeY,
-                        this.state.sizeZ || 0
+                        this.state.sizeZ
                     ],
                     chunk: [
                         this.state.chunkX,
@@ -1437,7 +1449,11 @@
                         this.cellPositionCache.set(cacheKey, positionMap);
                     }
 
-                    return this.cellPositionCache.get(cacheKey).get(rawPos) || 0;
+                    const positionMap = this.cellPositionCache.get(cacheKey);
+                    if (!positionMap || !positionMap.has(rawPos)) {
+                        throw new Error(`Cell position ${rawPos} not found in cache for algorithm ${params.cellAlgorithm}`);
+                    }
+                    return positionMap.get(rawPos);
                 }
 
                 return rawPos;
@@ -1478,19 +1494,26 @@
                                 const tempX = cx * chunkX;
                                 const tempY = cy * chunkY;
                                 const pos = this.getInterChunkPosition(tempX, tempY, 0, params);
-                                allChunkPositions.push({pos, index: cy * chunksX + cx});
+                                allChunkPositions.push({pos, index: cy * chunksX + cx, cx, cy});
                             }
                         }
                         allChunkPositions.sort((a, b) => a.pos - b.pos);
 
                         const positionMap = new Map();
+                        const coordMap = new Map();
                         allChunkPositions.forEach((item, seqIndex) => {
                             positionMap.set(item.pos, seqIndex);
+                            coordMap.set(seqIndex, {cx: item.cx, cy: item.cy});
                         });
                         this.chunkPositionCache.set(cacheKey, positionMap);
+                        this.chunkPositionCache.set(cacheKey + '-coords', coordMap);
                     }
 
-                    return this.chunkPositionCache.get(cacheKey).get(rawChunkPos) || 0;
+                    const positionMap = this.chunkPositionCache.get(cacheKey);
+                    if (!positionMap || !positionMap.has(rawChunkPos)) {
+                        throw new Error(`Chunk position ${rawChunkPos} not found in cache for algorithm ${params.chunkAlgorithm}`);
+                    }
+                    return positionMap.get(rawChunkPos);
                 }
 
                 return rawChunkPos;
@@ -1515,13 +1538,34 @@
                 let cellsBeforeThisChunk = 0;
                 for (let i = 0; i < normalizedChunkPos; i++) {
                     // Convert sequential chunk index back to chunk coordinates
-                    const tempChunksX = Math.ceil(sizeX / chunkX);
-                    const tempChunksY = Math.ceil(sizeY / chunkY);
+                    const chunksX = Math.ceil(sizeX / chunkX);
+                    const chunksY = Math.ceil(sizeY / chunkY);
 
                     let tempCX, tempCY;
-                    // This depends on the chunk algorithm - for now assume row-major for chunk ordering
-                    tempCY = Math.floor(i / tempChunksX);
-                    tempCX = i % tempChunksX;
+
+                    // Use the same algorithm as chunk linearization to get proper coordinates
+                    if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
+                        // For non-sequential algorithms, use the cached coordinate mapping
+                        const cacheKey = `${params.chunkAlgorithm}-${chunksX}-${chunksY}`;
+                        const coordCacheKey = cacheKey + '-coords';
+
+                        // The coordinate cache must exist from getNormalizedChunkPosition call
+                        const coordMap = this.chunkPositionCache.get(coordCacheKey);
+                        if (!coordMap || !coordMap.has(i)) {
+                            throw new Error(`Coordinate mapping not found for sequential position ${i} in algorithm ${params.chunkAlgorithm}`);
+                        }
+                        const coords = coordMap.get(i);
+                        tempCX = coords.cx;
+                        tempCY = coords.cy;
+                    } else if (params.chunkAlgorithm === 'col-major') {
+                        // Column-major: increment Y first, then X
+                        tempCX = Math.floor(i / chunksY);
+                        tempCY = i % chunksY;
+                    } else {
+                        // Row-major (default): increment X first, then Y
+                        tempCY = Math.floor(i / chunksX);
+                        tempCX = i % chunksX;
+                    }
 
                     // Calculate actual cells in this chunk
                     const startX = tempCX * chunkX;
@@ -1580,7 +1624,16 @@
                 return result;
             }
 
-            hilbertEncode2D(x, y, n) {
+            // Calculate the next power of 2 that is >= n
+            nextPowerOfTwo(n) {
+                if (n <= 1) return 1;
+                return Math.pow(2, Math.ceil(Math.log2(n)));
+            }
+
+            hilbertEncode2D(x, y, maxDim) {
+                // Hilbert curves require power-of-2 dimensions for correctness
+                const n = this.nextPowerOfTwo(maxDim);
+
                 let d = 0;
                 for (let s = n / 2; s > 0; s /= 2) {
                     let rx = (x & s) > 0 ? 1 : 0;
@@ -2381,10 +2434,12 @@
 
                 if (!positionToCell) {
                     positionToCell = new Map();
-                    for (let y = 0; y < sizeY; y++) {
-                        for (let x = 0; x < sizeX; x++) {
-                            const globalPos = this.getGlobalPosition(x, y, 0, params);
-                            positionToCell.set(globalPos, {x, y});
+                    for (let z = 0; z < Math.max(1, sizeZ); z++) {
+                        for (let y = 0; y < sizeY; y++) {
+                            for (let x = 0; x < sizeX; x++) {
+                                const globalPos = this.getGlobalPosition(x, y, z, params);
+                                positionToCell.set(globalPos, {x, y, z});
+                            }
                         }
                     }
                     this.positionCache.set(posMapKey, positionToCell);
@@ -2401,7 +2456,7 @@
                         // Use the same chunk color mapping as the spatial chunked view
                         const chunkCX = Math.floor(cell.x / chunkSizeX);
                         const chunkCY = Math.floor(cell.y / chunkSizeY);
-                        const chunkCZ = Math.floor((cell.z || 0) / Math.max(1, params.chunk[2]));
+                        const chunkCZ = Math.floor(cell.z / Math.max(1, params.chunk[2]));
                         const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
                         const colorIndex = spatialChunkColorMap.get(chunkKey);
 
