@@ -1647,22 +1647,8 @@
 
             drawChunkCellHighlights(params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
-
-                for (let y = 0; y < sizeY; y++) {
-                    for (let x = 0; x < sizeX; x++) {
-                        const chunkCoords = this.coordinateService.getChunkCoordinatesFromCell(x, y, chunkSizeX, chunkSizeY);
-
-                        if (chunkCoords.x === effectiveChunk.x && chunkCoords.y === effectiveChunk.y) {
-                            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                            this.ctx.fillRect(
-                                offsetX + x * cellSize,
-                                offsetY + y * cellSize,
-                                cellSize - 1,
-                                cellSize - 1
-                            );
-                        }
-                    }
-                }
+                const bounds = this.coordinateService.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkSizeX, chunkSizeY, sizeX, sizeY);
+                this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
             }
         }
 
@@ -1758,7 +1744,7 @@
                 if (effectiveCell) {
                     const chunkCoords = this.coordinateService.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
                     const bounds = this.coordinateService.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
-                    this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', null);
+                    this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', '#fff');
                 }
 
                 this.drawTouchedChunksOutline(data, params, sizeX, sizeY, cellSize, offsetX, offsetY);
@@ -1909,7 +1895,7 @@
 
                 if (effectiveChunk) {
                     const chunkRange = this.visualizer.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
-                    const showOutline = !this.visualizer.selectionState.hoveredCell;
+                    const showOutline = true;
                     this.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, showOutline);
                 }
             }
