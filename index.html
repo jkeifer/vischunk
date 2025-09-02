@@ -12,15 +12,21 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segue UI', Roboto, sans-serif;
             background: #1a1a2e;
             min-height: 100vh;
+            min-width: 320px;
             padding: 15px;
             color: #eee;
         }
 
         .container {
+            margin: 0 auto;
+        }
+
+        .content-wrapper {
             max-width: 1600px;
+            min-width: 320px;
             margin: 0 auto;
         }
 
@@ -55,7 +61,6 @@
         }
 
         .simulation-wrapper {
-            max-width: 1600px;
             padding: 15px 15px 15px;
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
             border-radius: 15px;
@@ -75,6 +80,7 @@
         .controls {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-rows: auto 1fr; /* Header row + content row */
             gap: 15px;
             margin-bottom: 15px;
         }
@@ -88,6 +94,8 @@
             flex-direction: column;
             gap: 15px;
         }
+
+        /* Removed problematic subgrid rules that were causing dropdown stacking */
 
         .section-title {
             font-weight: 600;
@@ -173,6 +181,12 @@
             margin-bottom: 15px;
         }
 
+        @media (max-width: 768px) {
+            .spatial-views {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .viz-panel {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
@@ -200,7 +214,10 @@
         canvas {
             display: block;
             width: 100%;
+            height: auto;
+            max-width: 100%;
             cursor: crosshair;
+            margin: 0 auto;
         }
 
         .linear-views {
@@ -218,7 +235,8 @@
         .metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 15px;
+            grid-template-rows: auto auto; /* Label row + value row, both natural size */
+            gap: 5px 15px; /* row-gap column-gap - tight gap between label/value, normal gap between metrics */
             padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 10px;
@@ -254,6 +272,17 @@
             border-radius: 8px;
             text-align: center;
             backdrop-filter: blur(10px);
+            display: grid;
+            grid-template-rows: subgrid; /* Align with parent grid rows */
+            grid-row: span 2; /* Span both label and value rows */
+        }
+
+        /* Fallback for browsers without subgrid support */
+        @supports not (grid-template-rows: subgrid) {
+            .metric {
+                display: block;
+                grid-row: auto;
+            }
         }
 
         .metric-label {
@@ -288,7 +317,6 @@
         }
 
         .explanation {
-            max-width: 1600px;
             margin: 40px auto 0 auto;
             padding: 15px 15px 15px;
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
@@ -440,12 +468,20 @@
         .preset-controls {
             display: flex;
             align-items: flex-end;
-            gap: 20px;
+            gap: 15px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .preset-controls .control-group {
+            flex: 1;
+            min-width: 180px;
         }
 
         .preset-controls .reset-button {
             margin: 0;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .gradient-legend {
@@ -473,12 +509,12 @@
             </a>
         </div>
 
-        <div class="simulation-wrapper">
+        <div class="content-wrapper simulation-wrapper">
             <h2>Interactive Simulation</h2>
 
             <div class="section-container">
                 <h2>Simulation Controls</h2>
-                
+
                 <div class="preset-controls">
                     <div class="control-group">
                         <label>Scenario Presets</label>
@@ -488,7 +524,7 @@
                     </div>
                     <button class="reset-button" id="resetButton">reset to default</button>
                 </div>
-                
+
             <div class="controls">
                 <div class="control-section">
                 <div class="section-title">Array Settings</div>
@@ -668,7 +704,7 @@
 
     <div class="tooltip" id="tooltip"></div>
 
-    <div class="explanation">
+    <div class="content-wrapper explanation">
         <h2>How to Interpret the Visualizations</h2>
 
         <div class="explanation-content">
@@ -746,6 +782,7 @@
         const CONFIG = {
             MAX_CANVAS_SIZE: 400,      // Maximum canvas size in pixels
             MIN_CELL_SIZE: 2,          // Minimum cell size for drawing details
+            VIEWPORT_CELL_SIZE: 8,     // Cell size threshold for viewport rendering
             MAX_CACHE_SIZE: 10000,     // Maximum entries in color cache before clearing
             RESIZE_DEBOUNCE_MS: 150    // Debounce timeout for resize events
         };
@@ -839,7 +876,7 @@
                 this.linearizationCache = new Map();
                 this.positionCache = new Map();
                 this.lastCanvasSize = new Map();
-                
+
                 // Initialize app state after loading from localStorage
                 this.loadSettings();
                 this.initializeControls();
@@ -851,18 +888,18 @@
             setState(newState) {
                 const oldState = { ...this.state };
                 this.state = { ...this.state, ...newState };
-                
+
                 // Clear caches if structural changes occurred
                 const structuralChanges = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ'];
-                const hasStructuralChanges = structuralChanges.some(key => 
+                const hasStructuralChanges = structuralChanges.some(key =>
                     key in newState && oldState[key] !== newState[key]
                 );
-                
+
                 if (hasStructuralChanges) {
                     this.clearCaches();
                 }
             }
-            
+
             // Full UI update cycle - call this after setState() when you want to update the display
             updateUI() {
                 this.renderUI();
@@ -871,11 +908,11 @@
                 this.updatePresetDisplay();
                 this.update();
             }
-            
+
             // Update HTML form constraints based on current state (no state changes)
             updateDOMConstraints() {
                 const { sizeX, sizeY, sizeZ } = this.state;
-                
+
                 document.getElementById('chunkX').max = sizeX;
                 document.getElementById('chunkY').max = sizeY;
                 document.getElementById('chunkZ').max = Math.max(1, sizeZ);
@@ -887,7 +924,7 @@
                 document.getElementById('queryZ1').max = Math.max(0, sizeZ - 1);
                 document.getElementById('queryZ2').max = Math.max(0, sizeZ - 1);
             }
-            
+
             // Sync UI elements to match current state
             renderUI() {
                 Object.keys(this.state).forEach(key => {
@@ -900,7 +937,7 @@
                     }
                 });
             }
-            
+
             // Clear all caches when structural changes occur
             clearCaches() {
                 this.linearizationCache.clear();
@@ -912,7 +949,7 @@
 
             populatePresetOptions() {
                 const presetsSelect = document.getElementById('presets');
-                
+
                 // Add preset options dynamically
                 Object.keys(PRESET_CONFIGS).forEach(presetKey => {
                     const option = document.createElement('option');
@@ -925,7 +962,7 @@
             initializeControls() {
                 // Populate preset options
                 this.populatePresetOptions();
-                
+
                 const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ',
                                  'chunkX', 'chunkY', 'chunkZ',
                                  'queryX1', 'queryX2', 'queryY1', 'queryY2',
@@ -934,17 +971,17 @@
                 controls.forEach(id => {
                     const element = document.getElementById(id);
                     element.addEventListener('change', (e) => {
-                        let value = e.target.type === 'number' ? 
-                            parseInt(e.target.value) || 0 : 
+                        let value = e.target.type === 'number' ?
+                            parseInt(e.target.value) || 0 :
                             e.target.value;
-                            
+
                         // Basic validation - more complex validation can be added here
                         if (e.target.type === 'number') {
                             value = Math.max(0, value); // No negative values
                             if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
                             if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
                         }
-                        
+
                         this.setState({ [id]: value });
                         this.updateUI();
                         this.saveSettings(); // Explicit save for user input
@@ -970,13 +1007,13 @@
                 // Save current preset settings (excluding currentPreset from the preset data)
                 const currentSettings = { ...this.state };
                 delete currentSettings.currentPreset;
-                
+
                 // Only save preset if it differs from canonical version
                 const canonicalSettings = this.getCanonicalPreset(this.state.currentPreset);
-                const hasChanges = canonicalSettings && Object.keys(canonicalSettings).some(key => 
+                const hasChanges = canonicalSettings && Object.keys(canonicalSettings).some(key =>
                     currentSettings[key] !== canonicalSettings[key]
                 );
-                
+
                 if (hasChanges) {
                     // Preset is modified - save it
                     this.appState.presets[this.state.currentPreset] = currentSettings;
@@ -984,10 +1021,10 @@
                     // Preset matches canonical - remove any saved version
                     delete this.appState.presets[this.state.currentPreset];
                 }
-                
+
                 // Always save the current preset selection
                 this.appState.currentPreset = this.state.currentPreset;
-                
+
                 // Save entire app state
                 localStorage.setItem('vischunk-app-state', JSON.stringify(this.appState));
             }
@@ -1004,12 +1041,12 @@
                     console.warn('Failed to load settings from localStorage:', error);
                     this.appState = DEFAULT_APP_STATE;
                 }
-                
+
                 // Initialize current visualization state from the selected preset
                 const currentPreset = this.appState.currentPreset;
-                const presetSettings = this.appState.presets[currentPreset] || 
+                const presetSettings = this.appState.presets[currentPreset] ||
                                      this.getCanonicalPreset(currentPreset);
-                
+
                 this.state = {
                     ...presetSettings,
                     currentPreset: currentPreset
@@ -1018,36 +1055,36 @@
 
             resetSettings() {
                 const presetName = this.state.currentPreset;
-                
+
                 // Remove user modifications for this preset
                 if (this.appState.presets[presetName]) {
                     delete this.appState.presets[presetName];
                 }
-                
+
                 // Load canonical preset
                 const canonicalSettings = this.getCanonicalPreset(presetName);
                 if (canonicalSettings) {
                     this.setState({ ...canonicalSettings, currentPreset: presetName });
                     this.updateUI();
                 }
-                
+
                 // Save the reset (removal of modifications)
                 this.saveSettings();
             }
-            
+
             updateResetButton() {
                 const resetButton = document.getElementById('resetButton');
                 const canonical = this.getCanonicalPreset(this.state.currentPreset);
-                
+
                 // Check if current state differs from canonical preset
-                const isChanged = canonical && Object.keys(canonical).some(key => 
+                const isChanged = canonical && Object.keys(canonical).some(key =>
                     this.state[key] !== canonical[key]
                 );
-                
+
                 resetButton.disabled = !isChanged;
                 resetButton.style.opacity = isChanged ? '1' : '0.5';
             }
-            
+
             // Get canonical preset settings (without user modifications)
             getCanonicalPreset(presetName) {
                 if (presetName === 'user') {
@@ -1058,21 +1095,21 @@
                 }
                 return null;
             }
-            
+
             // Get current preset settings (with user modifications if they exist)
             getCurrentPresetSettings(presetName) {
                 return this.appState.presets[presetName] || this.getCanonicalPreset(presetName);
             }
-            
+
             // Get display name for a preset
             getPresetDisplayName(presetName, includeModificationIndicator = false) {
-                let baseName = presetName === 'user' ? 'User Settings' : 
+                let baseName = presetName === 'user' ? 'User Settings' :
                               PRESET_CONFIGS[presetName]?.name || presetName;
-                              
+
                 if (includeModificationIndicator && this.isPresetModified(presetName)) {
                     baseName += ' *';
                 }
-                
+
                 return baseName;
             }
 
@@ -1084,13 +1121,13 @@
                     // Named presets are modified if they exist in appState.presets
                     return !!(this.appState && this.appState.presets && this.appState.presets[presetName]);
                 }
-                
+
                 return false;
             }
-            
+
             updatePresetDisplay() {
                 const presetsSelect = document.getElementById('presets');
-                
+
                 // Update all preset option text to show/hide asterisks
                 presetsSelect.querySelectorAll('option').forEach(option => {
                     option.textContent = this.getPresetDisplayName(option.value, true);
@@ -1100,20 +1137,20 @@
             loadPreset(presetName) {
                 // Update app state to track current preset selection
                 this.appState.currentPreset = presetName;
-                
+
                 const presetSettings = this.getCurrentPresetSettings(presetName);
                 if (presetSettings) {
                     this.setState({ ...presetSettings, currentPreset: presetName });
                     this.updateUI();
                 }
-                
+
                 // Only save when this is a user-initiated preset change, not during initialization
                 // The preset selection is already tracked in this.appState.currentPreset
                 // and will be saved when the user makes actual changes
             }
 
             updateConstraints() {
-                
+
                 // Validate and clamp state values to reasonable limits
                 let updates = {};
                 let { sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, queryX1, queryX2, queryY1, queryY2, queryZ1, queryZ2 } = this.state;
@@ -1210,33 +1247,43 @@
 
                 this.tooltip = document.getElementById('tooltip');
 
+                // Force initial resize after DOM is ready
+                setTimeout(() => {
+                    this.resizeCanvases();
+                    this.update();
+                }, 0);
+                
                 this.resizeCanvases();
-                // Debounce resize events for better performance
-                let resizeTimeout;
-                window.addEventListener('resize', () => {
-                    clearTimeout(resizeTimeout);
-                    resizeTimeout = setTimeout(() => {
+                
+                // Simple, efficient resize handling
+                let resizeRAF = null;
+                
+                const handleResize = () => {
+                    if (resizeRAF) return; // Prevent multiple concurrent updates
+                    
+                    resizeRAF = requestAnimationFrame(() => {
                         const needsUpdate = this.resizeCanvases();
                         if (needsUpdate) {
                             this.update();
-                        } else {
-                            // Even if canvases don't need update, headers might need realignment
-                            this.alignGridHeaders();
                         }
-                    }, CONFIG.RESIZE_DEBOUNCE_MS);
-                });
+                        resizeRAF = null;
+                    });
+                };
+                
+                // Only use window resize - simpler and more reliable
+                window.addEventListener('resize', handleResize);
             }
 
             setCanvasSize(key, width, height) {
                 const canvas = this.canvases[key];
                 const ctx = this.contexts[key];
                 const dpr = window.devicePixelRatio || 1;
-                
+
                 canvas.width = width * dpr;
                 canvas.height = height * dpr;
                 canvas.style.width = width + 'px';
                 canvas.style.height = height + 'px';
-                
+
                 // Reset transform before scaling to prevent accumulation
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.scale(dpr, dpr);
@@ -1248,14 +1295,21 @@
                 // Spatial canvases - square aspect
                 ['spatialUnchunked', 'spatialChunked'].forEach(key => {
                     const canvas = this.canvases[key];
-                    const rect = canvas.getBoundingClientRect();
-                    const size = Math.min(rect.width, CONFIG.MAX_CANVAS_SIZE);
+                    const canvasContainer = canvas.parentElement; // .canvas-container
+                    const vizPanel = canvasContainer.parentElement; // .viz-panel
+                    const containerRect = vizPanel.getBoundingClientRect();
+                    
+                    // Account for viz-panel padding (15px) and canvas-container padding (10px)
+                    const vizPanelPadding = 15;
+                    const canvasContainerPadding = 20; // 10px on each side
+                    const totalPadding = vizPanelPadding * 2 + canvasContainerPadding;
+                    
+                    const availableWidth = containerRect.width - totalPadding;
+                    const size = Math.min(availableWidth, CONFIG.MAX_CANVAS_SIZE);
                     const lastSize = this.lastCanvasSize.get(key);
 
-                    if (!lastSize || lastSize.width !== size || lastSize.height !== size) {
+                    if (size > 0 && (!lastSize || lastSize.width !== size || lastSize.height !== size)) {
                         this.setCanvasSize(key, size, size);
-                        // Center the canvas within its container
-                        canvas.style.margin = '0 auto';
                         this.lastCanvasSize.set(key, { width: size, height: size });
                         needsUpdate = true;
                     }
@@ -1264,12 +1318,20 @@
                 // Linear canvases - full width
                 ['linearUnchunked', 'linearChunked'].forEach(key => {
                     const canvas = this.canvases[key];
-                    const rect = canvas.getBoundingClientRect();
-                    const width = rect.width;
+                    const canvasContainer = canvas.parentElement; // .canvas-container
+                    const linearViz = canvasContainer.parentElement; // .linear-viz
+                    const containerRect = linearViz.getBoundingClientRect();
+                    
+                    // Account for linear-viz padding (15px) and canvas-container padding (10px)
+                    const linearVizPadding = 15;
+                    const canvasContainerPadding = 20; // 10px on each side
+                    const totalPadding = linearVizPadding * 2 + canvasContainerPadding;
+                    
+                    const width = containerRect.width - totalPadding;
                     const height = 120;
                     const lastSize = this.lastCanvasSize.get(key);
 
-                    if (!lastSize || lastSize.width !== width || lastSize.height !== height) {
+                    if (width > 0 && (!lastSize || lastSize.width !== width || lastSize.height !== height)) {
                         this.setCanvasSize(key, width, height);
                         this.lastCanvasSize.set(key, { width, height });
                         needsUpdate = true;
@@ -1659,14 +1721,22 @@
                     const data = this.currentData;
                     if (!data) return;
 
-                    const cellWidth = (canvas.width - 40) / data.totalCells;
+                    // Use same coordinate system as the drawing functions
+                    const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
+                    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+                    const cellWidth = (logicalWidth - 40) / data.totalCells;
                     const offsetX = 20;
                     const barHeight = 60;
                     const offsetY = 20;
 
+                    // Convert scaled mouse coordinates back to logical coordinates
+                    const dpr = window.devicePixelRatio || 1;
+                    const logicalX = x / dpr;
+                    const logicalY = y / dpr;
+
                     // Check if mouse is over the bar area
-                    if (y >= offsetY && y <= offsetY + barHeight) {
-                        const cellIndex = Math.floor((x - offsetX) / cellWidth);
+                    if (logicalY >= offsetY && logicalY <= offsetY + barHeight) {
+                        const cellIndex = Math.floor((logicalX - offsetX) / cellWidth);
 
                         if (cellIndex >= 0 && cellIndex < data.totalCells) {
                             // Find which cell this linear position corresponds to
@@ -1751,38 +1821,6 @@
                 });
             }
 
-            alignGridHeaders() {
-                // Align metric labels
-                this.alignHeaders('.metrics .metric-label');
-
-                // Align control section titles
-                this.alignHeaders('.controls .section-title');
-
-                // Align explanation section headings
-                this.alignHeaders('.explanation-content .explanation-section h3');
-            }
-
-            alignHeaders(selector) {
-                const headers = document.querySelectorAll(selector);
-                if (headers.length <= 1) return;
-
-                // Reset heights first
-                headers.forEach(header => {
-                    header.style.minHeight = '';
-                });
-
-                // Measure natural heights
-                let maxHeight = 0;
-                headers.forEach(header => {
-                    const height = header.offsetHeight;
-                    maxHeight = Math.max(maxHeight, height);
-                });
-
-                // Set all to max height
-                headers.forEach(header => {
-                    header.style.minHeight = maxHeight + 'px';
-                });
-            }
 
             update() {
                 const params = this.getParameters();
@@ -1805,7 +1843,6 @@
                 this.updateMetrics(data);
 
                 // Align grid headers after everything is rendered
-                setTimeout(() => this.alignGridHeaders(), 0);
             }
 
             calculateData(params) {
@@ -1905,9 +1942,9 @@
             drawSpatialUnchunked(params, data) {
                 const ctx = this.contexts.spatialUnchunked;
                 const canvas = this.canvases.spatialUnchunked;
-                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
-                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
-                
+                const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
+                const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+
                 ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 const [sizeX, sizeY, sizeZ] = params.size;
@@ -1918,18 +1955,43 @@
                 // Draw cells with gradient based on global linearization order
                 // Skip rendering individual cells if they're too small to see
                 if (cellSize > CONFIG.MIN_CELL_SIZE) {
-                    for (let y = 0; y < sizeY; y++) {
-                        for (let x = 0; x < sizeX; x++) {
-                            const globalPos = this.getGlobalPosition(x, y, 0, params);
-                            const color = this.getColorForLinearPosition(globalPos, data.totalCells - 1);
+                    // Use viewport-based rendering for medium-sized cells to improve performance
+                    if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && data.totalCells > 1000) {
+                        // Calculate visible cell range for viewport optimization
+                        const startX = Math.max(0, Math.floor(-offsetX / cellSize));
+                        const endX = Math.min(sizeX, Math.ceil((logicalWidth - offsetX) / cellSize));
+                        const startY = Math.max(0, Math.floor(-offsetY / cellSize));
+                        const endY = Math.min(sizeY, Math.ceil((logicalHeight - offsetY) / cellSize));
+                        
+                        for (let y = startY; y < endY; y++) {
+                            for (let x = startX; x < endX; x++) {
+                                const globalPos = this.getGlobalPosition(x, y, 0, params);
+                                const color = this.getColorForLinearPosition(globalPos, data.totalCells - 1);
 
-                            ctx.fillStyle = color;
-                            ctx.fillRect(
-                                offsetX + x * cellSize,
-                                offsetY + y * cellSize,
-                                cellSize - 1,
-                                cellSize - 1
-                            );
+                                ctx.fillStyle = color;
+                                ctx.fillRect(
+                                    offsetX + x * cellSize,
+                                    offsetY + y * cellSize,
+                                    cellSize - 1,
+                                    cellSize - 1
+                                );
+                            }
+                        }
+                    } else {
+                        // Full rendering for larger cells or smaller datasets
+                        for (let y = 0; y < sizeY; y++) {
+                            for (let x = 0; x < sizeX; x++) {
+                                const globalPos = this.getGlobalPosition(x, y, 0, params);
+                                const color = this.getColorForLinearPosition(globalPos, data.totalCells - 1);
+
+                                ctx.fillStyle = color;
+                                ctx.fillRect(
+                                    offsetX + x * cellSize,
+                                    offsetY + y * cellSize,
+                                    cellSize - 1,
+                                    cellSize - 1
+                                );
+                            }
                         }
                     }
                 } else {
@@ -2007,9 +2069,9 @@
             drawSpatialChunked(params, data) {
                 const ctx = this.contexts.spatialChunked;
                 const canvas = this.canvases.spatialChunked;
-                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
-                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
-                
+                const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
+                const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+
                 ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 const [sizeX, sizeY, sizeZ] = params.size;
@@ -2060,8 +2122,18 @@
                 }
 
                 // Draw each chunk as a solid rectangle
-                for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
-                    for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
+                // Apply viewport optimization for large chunk arrays
+                let startChunkX = 0, endChunkX = chunksX, startChunkY = 0, endChunkY = chunksY;
+                
+                if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && chunksX * chunksY > 100) {
+                    startChunkX = Math.max(0, Math.floor(-offsetX / (chunkX * cellSize)));
+                    endChunkX = Math.min(chunksX, Math.ceil((logicalWidth - offsetX) / (chunkX * cellSize)));
+                    startChunkY = Math.max(0, Math.floor(-offsetY / (chunkY * cellSize)));
+                    endChunkY = Math.min(chunksY, Math.ceil((logicalHeight - offsetY) / (chunkY * cellSize)));
+                }
+                
+                for (let chunkCY = startChunkY; chunkCY < endChunkY; chunkCY++) {
+                    for (let chunkCX = startChunkX; chunkCX < endChunkX; chunkCX++) {
                         const chunkCZ = 0; // For 2D spatial view, we show Z=0 slice
                         const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
                         const colorIndex = chunkColorMap.get(chunkKey);
@@ -2073,7 +2145,7 @@
                         const startY = chunkCY * chunkY;
                         const endX = Math.min(startX + chunkX, sizeX);
                         const endY = Math.min(startY + chunkY, sizeY);
-                        
+
                         const chunkPixelWidth = (endX - startX) * cellSize;
                         const chunkPixelHeight = (endY - startY) * cellSize;
 
@@ -2084,7 +2156,7 @@
                             chunkPixelWidth,
                             chunkPixelHeight
                         );
-                        
+
                         // Draw chunk border
                         ctx.strokeStyle = '#333';
                         ctx.lineWidth = 1;
@@ -2180,9 +2252,9 @@
             drawLinearUnchunked(params, data) {
                 const ctx = this.contexts.linearUnchunked;
                 const canvas = this.canvases.linearUnchunked;
-                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
-                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
-                
+                const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
+                const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+
                 ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 const cellWidth = (logicalWidth - 40) / data.totalCells;
@@ -2286,9 +2358,9 @@
             drawLinearChunked(params, data) {
                 const ctx = this.contexts.linearChunked;
                 const canvas = this.canvases.linearChunked;
-                const logicalWidth = parseInt(canvas.style.width) || canvas.width;
-                const logicalHeight = parseInt(canvas.style.height) || canvas.height;
-                
+                const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
+                const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+
                 ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
                 const cellWidth = (logicalWidth - 40) / data.totalCells;
