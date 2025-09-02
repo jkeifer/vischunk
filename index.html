@@ -1204,9 +1204,10 @@
         class TooltipManager {
             constructor(tooltipElement) {
                 this.tooltip = tooltipElement;
+                this.isSticky = false;
             }
 
-            show(e, content) {
+            show(e, content, sticky = false) {
                 this.tooltip.style.display = 'block';
                 this.tooltip.style.position = 'absolute';
                 this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
@@ -1214,10 +1215,12 @@
                 this.tooltip.style.transform = 'none';
                 this.tooltip.style.margin = '0';
                 this.tooltip.textContent = content;
+                this.isSticky = sticky;
             }
 
             hide() {
                 this.tooltip.style.display = 'none';
+                this.isSticky = false;
             }
 
             updateContent(content) {
@@ -1228,6 +1231,12 @@
                 if (this.tooltip.style.display === 'block') {
                     this.tooltip.style.left = `${e.clientX + window.scrollX + 10}px`;
                     this.tooltip.style.top = `${e.clientY + window.scrollY - 30}px`;
+                }
+            }
+
+            hideIfNotSticky() {
+                if (!this.isSticky) {
+                    this.hide();
                 }
             }
         }
@@ -1985,20 +1994,20 @@
                 }
             }
 
-            showTooltip(e, targetInfo) {
+            showTooltip(e, targetInfo, sticky = false) {
                 const params = this.visualizer.getParameters();
                 if (targetInfo.cell && targetInfo.usesCellTooltip) {
-                    this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip(targetInfo.cell, params, this.visualizer));
+                    this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip(targetInfo.cell, params, this.visualizer), sticky);
                 } else if (targetInfo.chunk) {
                     const [sizeX, sizeY] = params.size;
                     const [chunkX, chunkY] = params.chunk;
-                    this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip(targetInfo.chunk, params, sizeX, sizeY, chunkX, chunkY, this.visualizer));
+                    this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip(targetInfo.chunk, params, sizeX, sizeY, chunkX, chunkY, this.visualizer), sticky);
                 }
             }
 
             clearHover() {
                 this.visualizer.selectionState.clearHover();
-                this.tooltipManager.hide();
+                this.tooltipManager.hideIfNotSticky();
             }
 
             handleSelectionLogic(e, targetInfo) {
@@ -2014,7 +2023,7 @@
                         // Select new item
                         this.visualizer.selectionState.setSelectedCell(clickedCell);
                         this.visualizer.selectionState.setSelectedChunk(clickedChunk);
-                        this.showTooltip(e, targetInfo);
+                        this.showTooltip(e, targetInfo, true); // Make tooltip sticky
                     }
                 } else {
                     // Clicked outside any item - clear selection
@@ -2129,7 +2138,7 @@
 
             handleMouseLeave() {
                 this.visualizer.selectionState.clearHover();
-                this.tooltipManager.hide();
+                this.tooltipManager.hideIfNotSticky();
                 // Use requestAnimationFrame for smoother updates
                 if (this.visualizer.updatePending) return;
                 this.visualizer.updatePending = true;
