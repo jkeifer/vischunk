@@ -826,6 +826,301 @@
             }
         }
 
+        class CacheKeyGenerator {
+            static createLinearizationKey(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
+                return `${x},${y},${z},${sizeX},${sizeY},${sizeZ},${algorithm}`;
+            }
+
+            static createCellPositionKey(algorithm, chunkX, chunkY, chunkZ) {
+                return `cell-${algorithm}-${chunkX}-${chunkY}-${chunkZ}`;
+            }
+
+            static createChunkPositionKey(algorithm, chunksX, chunksY) {
+                return `${algorithm}-${chunksX}-${chunksY}`;
+            }
+
+            static createChunkColorMapKey(chunksX, chunksY, chunksZ, algorithm) {
+                return `${chunksX},${chunksY},${chunksZ},${algorithm}`;
+            }
+
+            static createPositionToCellMapKey(sizeX, sizeY, cellAlgorithm, chunkAlgorithm, chunkSizeX, chunkSizeY) {
+                return `${sizeX},${sizeY},${cellAlgorithm},${chunkAlgorithm},${chunkSizeX},${chunkSizeY}`;
+            }
+
+            static createColorKey(position, maxPosition) {
+                return `${position}-${maxPosition}`;
+            }
+        }
+
+        class ChunkCoordinateManager {
+            constructor(chunkPositionCache) {
+                this.chunkPositionCache = chunkPositionCache;
+            }
+
+            getChunkCoordinatesFromSequentialIndex(sequentialIndex, params) {
+                const [sizeX, sizeY] = params.size;
+                const [chunkX, chunkY] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+
+                if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
+                    return this.getNonSequentialChunkCoordinates(sequentialIndex, params, chunksX, chunksY);
+                } else if (params.chunkAlgorithm === 'col-major') {
+                    return {
+                        cx: Math.floor(sequentialIndex / chunksY),
+                        cy: sequentialIndex % chunksY
+                    };
+                } else {
+                    // Row-major (default)
+                    return {
+                        cy: Math.floor(sequentialIndex / chunksX),
+                        cx: sequentialIndex % chunksX
+                    };
+                }
+            }
+
+            getNonSequentialChunkCoordinates(sequentialIndex, params, chunksX, chunksY) {
+                const cacheKey = CacheKeyGenerator.createChunkPositionKey(params.chunkAlgorithm, chunksX, chunksY);
+                const coordCacheKey = cacheKey + '-coords';
+
+                const coordMap = this.chunkPositionCache.get(coordCacheKey);
+                if (!coordMap || !coordMap.has(sequentialIndex)) {
+                    throw new Error(`Coordinate mapping not found for sequential position ${sequentialIndex} in algorithm ${params.chunkAlgorithm}`);
+                }
+                return coordMap.get(sequentialIndex);
+            }
+
+            calculateActualCellsInChunk(chunkCX, chunkCY, params) {
+                const [sizeX, sizeY] = params.size;
+                const [chunkX, chunkY] = params.chunk;
+
+                const startX = chunkCX * chunkX;
+                const startY = chunkCY * chunkY;
+                const endX = Math.min(startX + chunkX, sizeX);
+                const endY = Math.min(startY + chunkY, sizeY);
+                
+                return (endX - startX) * (endY - startY);
+            }
+        }
+
+        class LinearizationEngine {
+            constructor(linearizationCache, positionCache, chunkPositionCache, cellPositionCache) {
+                this.linearizationCache = linearizationCache;
+                this.positionCache = positionCache;
+                this.chunkPositionCache = chunkPositionCache;
+                this.cellPositionCache = cellPositionCache;
+                this.chunkCoordManager = new ChunkCoordinateManager(chunkPositionCache);
+            }
+
+            linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
+                const key = CacheKeyGenerator.createLinearizationKey(x, y, z, sizeX, sizeY, sizeZ, algorithm);
+                if (this.linearizationCache.has(key)) {
+                    return this.linearizationCache.get(key);
+                }
+
+                let result = this.calculateLinearPosition(x, y, z, sizeX, sizeY, sizeZ, algorithm);
+                this.linearizationCache.set(key, result);
+                return result;
+            }
+
+            calculateLinearPosition(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
+                switch(algorithm) {
+                    case 'row-major':
+                        return x + y * sizeX + z * sizeX * sizeY;
+                    case 'col-major':
+                        return y + x * sizeY + z * sizeX * sizeY;
+                    case 'z-order':
+                        return sizeZ > 0 ? this.mortonEncode3D(x, y, z) : this.mortonEncode2D(x, y);
+                    case 'hilbert':
+                        if (sizeZ > 0) {
+                            return z * sizeX * sizeY + this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        } else {
+                            return this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        }
+                    default:
+                        return x + y * sizeX + z * sizeX * sizeY;
+                }
+            }
+
+            getIntraChunkPosition(x, y, z, params) {
+                const [chunkX, chunkY, chunkZ] = params.chunk;
+                const localX = x % chunkX;
+                const localY = y % chunkY;
+                const localZ = z % chunkZ;
+                const rawPos = this.linearizeCoordinate(localX, localY, localZ, chunkX, chunkY, chunkZ, params.cellAlgorithm);
+
+                if (params.cellAlgorithm === 'z-order' || params.cellAlgorithm === 'hilbert') {
+                    return this.getNormalizedCellPosition(rawPos, params, chunkX, chunkY, chunkZ);
+                }
+
+                return rawPos;
+            }
+
+            getNormalizedCellPosition(rawPos, params, chunkX, chunkY, chunkZ) {
+                const cacheKey = CacheKeyGenerator.createCellPositionKey(params.cellAlgorithm, chunkX, chunkY, chunkZ);
+
+                if (!this.cellPositionCache.has(cacheKey)) {
+                    this.buildCellPositionCache(cacheKey, params, chunkX, chunkY, chunkZ);
+                }
+
+                const positionMap = this.cellPositionCache.get(cacheKey);
+                if (!positionMap || !positionMap.has(rawPos)) {
+                    throw new Error(`Cell position ${rawPos} not found in cache for algorithm ${params.cellAlgorithm}`);
+                }
+                return positionMap.get(rawPos);
+            }
+
+            buildCellPositionCache(cacheKey, params, chunkX, chunkY, chunkZ) {
+                const allCellPositions = [];
+                for (let cz = 0; cz < Math.max(1, chunkZ); cz++) {
+                    for (let cy = 0; cy < chunkY; cy++) {
+                        for (let cx = 0; cx < chunkX; cx++) {
+                            const pos = this.linearizeCoordinate(cx, cy, cz, chunkX, chunkY, chunkZ, params.cellAlgorithm);
+                            allCellPositions.push(pos);
+                        }
+                    }
+                }
+                allCellPositions.sort((a, b) => a - b);
+
+                const positionMap = new Map();
+                allCellPositions.forEach((pos, seqIndex) => {
+                    positionMap.set(pos, seqIndex);
+                });
+                this.cellPositionCache.set(cacheKey, positionMap);
+            }
+
+            getInterChunkPosition(x, y, z, params) {
+                const [sizeX, sizeY, sizeZ] = params.size;
+                const [chunkX, chunkY, chunkZ] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+                const chunksZ = Math.ceil(sizeZ / chunkZ);
+                const chunkCX = Math.floor(x / chunkX);
+                const chunkCY = Math.floor(y / chunkY);
+                const chunkCZ = Math.floor(z / chunkZ);
+                return this.linearizeCoordinate(chunkCX, chunkCY, chunkCZ, chunksX, chunksY, chunksZ, params.chunkAlgorithm);
+            }
+
+            getNormalizedChunkPosition(x, y, z, params) {
+                const rawChunkPos = this.getInterChunkPosition(x, y, z, params);
+
+                if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
+                    return this.getNormalizedNonSequentialChunkPosition(rawChunkPos, params);
+                }
+
+                return rawChunkPos;
+            }
+
+            getNormalizedNonSequentialChunkPosition(rawChunkPos, params) {
+                const [sizeX, sizeY] = params.size;
+                const [chunkX, chunkY] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+
+                const cacheKey = CacheKeyGenerator.createChunkPositionKey(params.chunkAlgorithm, chunksX, chunksY);
+
+                if (!this.chunkPositionCache.has(cacheKey)) {
+                    this.buildChunkPositionCache(cacheKey, params, chunksX, chunksY, chunkX, chunkY);
+                }
+
+                const positionMap = this.chunkPositionCache.get(cacheKey);
+                if (!positionMap || !positionMap.has(rawChunkPos)) {
+                    throw new Error(`Chunk position ${rawChunkPos} not found in cache for algorithm ${params.chunkAlgorithm}`);
+                }
+                return positionMap.get(rawChunkPos);
+            }
+
+            buildChunkPositionCache(cacheKey, params, chunksX, chunksY, chunkX, chunkY) {
+                const allChunkPositions = [];
+                for (let cy = 0; cy < chunksY; cy++) {
+                    for (let cx = 0; cx < chunksX; cx++) {
+                        const tempX = cx * chunkX;
+                        const tempY = cy * chunkY;
+                        const pos = this.getInterChunkPosition(tempX, tempY, 0, params);
+                        allChunkPositions.push({pos, index: cy * chunksX + cx, cx, cy});
+                    }
+                }
+                allChunkPositions.sort((a, b) => a.pos - b.pos);
+
+                const positionMap = new Map();
+                const coordMap = new Map();
+                allChunkPositions.forEach((item, seqIndex) => {
+                    positionMap.set(item.pos, seqIndex);
+                    coordMap.set(seqIndex, {cx: item.cx, cy: item.cy});
+                });
+                this.chunkPositionCache.set(cacheKey, positionMap);
+                this.chunkPositionCache.set(cacheKey + '-coords', coordMap);
+            }
+
+            getGlobalPosition(x, y, z, params) {
+                const [sizeX, sizeY] = params.size;
+                const [chunkX, chunkY, chunkZ] = params.chunk;
+
+                const normalizedChunkPos = this.getNormalizedChunkPosition(x, y, z, params);
+                const cellsBeforeThisChunk = this.calculateCellsBeforeChunk(normalizedChunkPos, params);
+                const intraChunkPos = this.getIntraChunkPosition(x, y, z, params);
+                
+                return cellsBeforeThisChunk + intraChunkPos;
+            }
+
+            calculateCellsBeforeChunk(normalizedChunkPos, params) {
+                let cellsBeforeThisChunk = 0;
+                for (let i = 0; i < normalizedChunkPos; i++) {
+                    const chunkCoords = this.chunkCoordManager.getChunkCoordinatesFromSequentialIndex(i, params);
+                    const actualCellsInChunk = this.chunkCoordManager.calculateActualCellsInChunk(chunkCoords.cx, chunkCoords.cy, params);
+                    cellsBeforeThisChunk += actualCellsInChunk;
+                }
+                return cellsBeforeThisChunk;
+            }
+
+            mortonEncode2D(x, y) {
+                let result = 0;
+                for (let i = 0; i < 16; i++) {
+                    result |= ((x & (1 << i)) << i) | ((y & (1 << i)) << (i + 1));
+                }
+                return result;
+            }
+
+            mortonEncode3D(x, y, z) {
+                let result = 0;
+                for (let i = 0; i < 10; i++) {
+                    result |= ((x & (1 << i)) << (2 * i)) |
+                              ((y & (1 << i)) << (2 * i + 1)) |
+                              ((z & (1 << i)) << (2 * i + 2));
+                }
+                return result;
+            }
+
+            nextPowerOfTwo(n) {
+                if (n <= 1) return 1;
+                return Math.pow(2, Math.ceil(Math.log2(n)));
+            }
+
+            hilbertEncode2D(x, y, maxDim) {
+                const n = this.nextPowerOfTwo(maxDim);
+
+                let d = 0;
+                for (let s = n / 2; s > 0; s /= 2) {
+                    let rx = (x & s) > 0 ? 1 : 0;
+                    let ry = (y & s) > 0 ? 1 : 0;
+                    d += s * s * ((3 * rx) ^ ry);
+                    [x, y] = this.hilbertRotate(s, x, y, rx, ry);
+                }
+                return d;
+            }
+
+            hilbertRotate(n, x, y, rx, ry) {
+                if (ry === 0) {
+                    if (rx === 1) {
+                        x = n - 1 - x;
+                        y = n - 1 - y;
+                    }
+                    [x, y] = [y, x];
+                }
+                return [x, y];
+            }
+        }
+
         const PRESET_CONFIGS = {
             'small-tiles': {
                 name: 'Small Tiles vs Large Query',
@@ -1082,9 +1377,10 @@
         }
 
         class BaseCanvasRenderer {
-            constructor(canvas, context) {
+            constructor(canvas, context, visualizer) {
                 this.canvas = canvas;
                 this.ctx = context;
+                this.visualizer = visualizer;
             }
 
             getLogicalDimensions() {
@@ -1100,7 +1396,6 @@
             }
 
             drawCellHighlight(x, y, cellSize, offsetX, offsetY, fillStyle = 'rgba(255, 255, 255, 0.4)', strokeStyle = '#fff', lineWidth = 3) {
-                // Highlight background
                 this.ctx.fillStyle = fillStyle;
                 this.ctx.fillRect(
                     offsetX + x * cellSize,
@@ -1109,7 +1404,6 @@
                     cellSize - 1
                 );
 
-                // Highlight outline
                 this.ctx.strokeStyle = strokeStyle;
                 this.ctx.lineWidth = lineWidth;
                 this.ctx.strokeRect(
@@ -1124,13 +1418,11 @@
                 const width = (endX - startX) * cellSize - 1;
                 const height = (endY - startY) * cellSize - 1;
 
-                // Highlight background
                 if (fillStyle) {
                     this.ctx.fillStyle = fillStyle;
                     this.ctx.fillRect(offsetX + startX * cellSize, offsetY + startY * cellSize, width, height);
                 }
 
-                // Highlight outline
                 if (strokeStyle) {
                     this.ctx.strokeStyle = strokeStyle;
                     this.ctx.lineWidth = lineWidth;
@@ -1205,13 +1497,11 @@
                     const x1 = offsetX + start * cellWidth;
                     const x2 = offsetX + (end + 1) * cellWidth;
 
-                    // Draw range line
                     this.ctx.beginPath();
                     this.ctx.moveTo(x1, offsetY + barHeight + 5);
                     this.ctx.lineTo(x2, offsetY + barHeight + 5);
                     this.ctx.stroke();
 
-                    // Draw range markers
                     this.ctx.beginPath();
                     this.ctx.moveTo(x1, offsetY + barHeight);
                     this.ctx.lineTo(x1, offsetY + barHeight + 10);
@@ -1220,7 +1510,6 @@
                     this.ctx.stroke();
                 });
 
-                // Draw label
                 this.ctx.fillStyle = '#aaa';
                 this.ctx.font = '11px monospace';
                 this.ctx.textAlign = 'center';
@@ -1240,15 +1529,346 @@
                 const chunkCellCount = chunkRange.positions.length;
                 const chunkPixelWidth = chunkCellCount * cellWidth;
 
-                // Background highlight
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                 this.ctx.fillRect(offsetX + chunkRange.min * cellWidth, offsetY, chunkPixelWidth, barHeight);
 
-                // Outline if requested
                 if (showOutline) {
                     this.ctx.strokeStyle = '#fff';
                     this.ctx.lineWidth = 3;
                     this.ctx.strokeRect(offsetX + chunkRange.min * cellWidth, offsetY, chunkPixelWidth, barHeight);
+                }
+            }
+
+            // Template method for rendering - to be implemented by subclasses
+            render(params, data) {
+                throw new Error('render() must be implemented by subclass');
+            }
+        }
+
+        class SpatialUnchunkedRenderer extends BaseCanvasRenderer {
+            render(params, data) {
+                this.clearCanvas();
+                
+                const [sizeX, sizeY] = params.size;
+                const { cellSize, offsetX, offsetY } = this.getSpatialCellLayout(sizeX, sizeY);
+
+                this.drawCellGrid(params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
+                this.drawSpatialHighlights(params, sizeX, sizeY, cellSize, offsetX, offsetY);
+                this.drawQueryRegionOutline(params.query, sizeX, sizeY, cellSize, offsetX, offsetY);
+            }
+
+            drawCellGrid(params, data, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                if (cellSize > CONFIG.MIN_CELL_SIZE) {
+                    this.drawDetailedCellGrid(params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
+                } else {
+                    const gradient = this.ctx.createLinearGradient(offsetX, offsetY, offsetX + sizeX * cellSize, offsetY + sizeY * cellSize);
+                    gradient.addColorStop(0, '#00ff00');
+                    gradient.addColorStop(1, '#ff0000');
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fillRect(offsetX, offsetY, sizeX * cellSize, sizeY * cellSize);
+                }
+            }
+
+            drawDetailedCellGrid(params, data, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                const { width: logicalWidth } = this.getLogicalDimensions();
+
+                if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && data.totalCells > 1000) {
+                    const startX = Math.max(0, Math.floor(-offsetX / cellSize));
+                    const endX = Math.min(sizeX, Math.ceil((logicalWidth - offsetX) / cellSize));
+                    const startY = Math.max(0, Math.floor(-offsetY / cellSize));
+                    const endY = Math.min(sizeY, Math.ceil((logicalWidth - offsetY) / cellSize));
+                    this.drawCellRange(params, data, startX, endX, startY, endY, cellSize, offsetX, offsetY);
+                } else {
+                    this.drawCellRange(params, data, 0, sizeX, 0, sizeY, cellSize, offsetX, offsetY);
+                }
+            }
+
+            drawCellRange(params, data, startX, endX, startY, endY, cellSize, offsetX, offsetY) {
+                for (let y = startY; y < endY; y++) {
+                    for (let x = startX; x < endX; x++) {
+                        const globalPos = this.visualizer.getGlobalPosition(x, y, 0, params);
+                        const color = this.visualizer.getColorForLinearPosition(globalPos, data.totalCells - 1);
+
+                        this.ctx.fillStyle = color;
+                        this.ctx.fillRect(
+                            offsetX + x * cellSize,
+                            offsetY + y * cellSize,
+                            cellSize - 1,
+                            cellSize - 1
+                        );
+                    }
+                }
+            }
+
+            drawSpatialHighlights(params, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                const effectiveCell = this.visualizer.getEffectiveCell();
+                const effectiveChunk = this.visualizer.getEffectiveChunk();
+
+                if (cellSize > CONFIG.MIN_CELL_SIZE && effectiveCell) {
+                    this.drawCellHighlight(effectiveCell.x, effectiveCell.y, cellSize, offsetX, offsetY);
+                }
+
+                if (effectiveChunk && !effectiveCell) {
+                    this.drawChunkCellHighlights(params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY);
+                }
+            }
+
+            drawChunkCellHighlights(params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                const [chunkSizeX, chunkSizeY] = params.chunk;
+
+                for (let y = 0; y < sizeY; y++) {
+                    for (let x = 0; x < sizeX; x++) {
+                        const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(x, y, chunkSizeX, chunkSizeY);
+
+                        if (chunkCoords.x === effectiveChunk.x && chunkCoords.y === effectiveChunk.y) {
+                            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                            this.ctx.fillRect(
+                                offsetX + x * cellSize,
+                                offsetY + y * cellSize,
+                                cellSize - 1,
+                                cellSize - 1
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        class SpatialChunkedRenderer extends BaseCanvasRenderer {
+            render(params, data) {
+                this.clearCanvas();
+                
+                const [sizeX, sizeY, sizeZ] = params.size;
+                const { cellSize, offsetX, offsetY } = this.getSpatialCellLayout(sizeX, sizeY);
+
+                const chunkColorMap = this.visualizer.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
+                this.drawChunkGrid(params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY);
+                this.drawChunkedViewHighlights(params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
+            }
+
+            drawChunkGrid(params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY) {
+                const [chunkX, chunkY] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+                const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
+
+                const { width: logicalWidth, height: logicalHeight } = this.getLogicalDimensions();
+                const { startChunkX, endChunkX, startChunkY, endChunkY } = this.getChunkViewport(
+                    chunksX, chunksY, cellSize, chunkX, chunkY, offsetX, offsetY, logicalWidth, logicalHeight
+                );
+
+                const totalChunks = chunksX * chunksY * chunksZ;
+
+                for (let chunkCY = startChunkY; chunkCY < endChunkY; chunkCY++) {
+                    for (let chunkCX = startChunkX; chunkCX < endChunkX; chunkCX++) {
+                        this.drawSingleChunk(chunkColorMap, chunkCX, chunkCY, totalChunks, 
+                                           params, sizeX, sizeY, cellSize, offsetX, offsetY);
+                    }
+                }
+            }
+
+            getChunkViewport(chunksX, chunksY, cellSize, chunkX, chunkY, offsetX, offsetY, logicalWidth, logicalHeight) {
+                if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && chunksX * chunksY > 100) {
+                    return {
+                        startChunkX: Math.max(0, Math.floor(-offsetX / (chunkX * cellSize))),
+                        endChunkX: Math.min(chunksX, Math.ceil((logicalWidth - offsetX) / (chunkX * cellSize))),
+                        startChunkY: Math.max(0, Math.floor(-offsetY / (chunkY * cellSize))),
+                        endChunkY: Math.min(chunksY, Math.ceil((logicalHeight - offsetY) / (chunkY * cellSize)))
+                    };
+                }
+                return { startChunkX: 0, endChunkX: chunksX, startChunkY: 0, endChunkY: chunksY };
+            }
+
+            drawSingleChunk(chunkColorMap, chunkCX, chunkCY, totalChunks, params, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                const [chunkX, chunkY] = params.chunk;
+                const chunkCZ = 0;
+                const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
+                const colorIndex = chunkColorMap.get(chunkKey);
+                const color = this.visualizer.getColorForLinearPosition(colorIndex, totalChunks - 1);
+
+                const bounds = CoordinateUtils.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
+                const chunkPixelWidth = (bounds.endX - bounds.startX) * cellSize;
+                const chunkPixelHeight = (bounds.endY - bounds.startY) * cellSize;
+
+                this.ctx.fillStyle = color;
+                this.ctx.fillRect(
+                    offsetX + bounds.startX * cellSize,
+                    offsetY + bounds.startY * cellSize,
+                    chunkPixelWidth,
+                    chunkPixelHeight
+                );
+
+                this.ctx.strokeStyle = '#333';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(
+                    offsetX + bounds.startX * cellSize,
+                    offsetY + bounds.startY * cellSize,
+                    chunkPixelWidth,
+                    chunkPixelHeight
+                );
+            }
+
+            drawChunkedViewHighlights(params, data, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                const effectiveCell = this.visualizer.getEffectiveCell();
+                const effectiveChunk = this.visualizer.getEffectiveChunk();
+                const [chunkX, chunkY] = params.chunk;
+
+                if (effectiveCell) {
+                    const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
+                    const bounds = CoordinateUtils.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
+                    this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', null);
+                }
+
+                this.drawTouchedChunksOutline(data, params, sizeX, sizeY, cellSize, offsetX, offsetY);
+
+                if (effectiveChunk && !effectiveCell) {
+                    const bounds = CoordinateUtils.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
+                    this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
+                }
+            }
+
+            drawTouchedChunksOutline(data, params, sizeX, sizeY, cellSize, offsetX, offsetY) {
+                if (data.touchedChunks.size === 0) return;
+
+                const [chunkX, chunkY] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkX);
+
+                let minChunkX = Infinity, minChunkY = Infinity;
+                let maxChunkX = -Infinity, maxChunkY = -Infinity;
+
+                data.touchedChunks.forEach(chunkIdx => {
+                    const chunkCY = Math.floor(chunkIdx / chunksX);
+                    const chunkCX = chunkIdx % chunksX;
+                    minChunkX = Math.min(minChunkX, chunkCX);
+                    minChunkY = Math.min(minChunkY, chunkCY);
+                    maxChunkX = Math.max(maxChunkX, chunkCX);
+                    maxChunkY = Math.max(maxChunkY, chunkCY);
+                });
+
+                const startX = minChunkX * chunkX;
+                const startY = minChunkY * chunkY;
+                const endX = Math.min((maxChunkX + 1) * chunkX, sizeX);
+                const endY = Math.min((maxChunkY + 1) * chunkY, sizeY);
+
+                this.ctx.strokeStyle = '#4a9eff';
+                this.ctx.lineWidth = 3;
+                this.ctx.strokeRect(
+                    offsetX + startX * cellSize,
+                    offsetY + startY * cellSize,
+                    (endX - startX) * cellSize - 1,
+                    (endY - startY) * cellSize - 1
+                );
+            }
+        }
+
+        class LinearUnchunkedRenderer extends BaseCanvasRenderer {
+            render(params, data) {
+                this.clearCanvas();
+
+                const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(data.totalCells);
+                
+                this.drawLinearBar(cellWidth, barHeight, offsetX, offsetY, data.totalCells, 
+                                (i, total) => this.visualizer.getColorForLinearPosition(i, total));
+
+                const requestedPositions = this.getRequestedCellPositions(data, params);
+                this.highlightLinearCells(requestedPositions, cellWidth, barHeight, offsetX, offsetY);
+
+                this.drawLinearUnchunkedHighlights(params, cellWidth, barHeight, offsetX, offsetY);
+                this.drawByteRanges(data.unchunkedRanges, cellWidth, barHeight, offsetX, offsetY, 'byte range(s)');
+            }
+
+            getRequestedCellPositions(data, params) {
+                return [...data.requestedCells].map(key => {
+                    const [x, y, z] = key.split(',').map(Number);
+                    return this.visualizer.getGlobalPosition(x, y, z, params);
+                });
+            }
+
+            drawLinearUnchunkedHighlights(params, cellWidth, barHeight, offsetX, offsetY) {
+                const effectiveCell = this.visualizer.getEffectiveCell();
+                const effectiveChunk = this.visualizer.getEffectiveChunk();
+
+                if (effectiveChunk) {
+                    const chunkRange = this.visualizer.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
+                    this.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, !effectiveCell);
+                }
+
+                if (effectiveCell) {
+                    const pos = this.visualizer.getGlobalPosition(effectiveCell.x, effectiveCell.y, 0, params);
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
+                }
+            }
+        }
+
+        class LinearChunkedRenderer extends BaseCanvasRenderer {
+            render(params, data) {
+                this.clearCanvas();
+
+                const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(data.totalCells);
+                const [sizeX, sizeY, sizeZ] = params.size;
+
+                const positionToCell = this.visualizer.getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ);
+                const spatialChunkColorMap = this.visualizer.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
+
+                this.drawLinearChunkedCells(params, data, positionToCell, spatialChunkColorMap, 
+                                          cellWidth, barHeight, offsetX, offsetY, sizeX, sizeY, sizeZ);
+
+                const actualCellPositions = this.getActualCellPositions(data, params);
+                this.highlightLinearCells(actualCellPositions, cellWidth, barHeight, offsetX, offsetY);
+
+                this.drawLinearChunkedHighlights(params, cellWidth, barHeight, offsetX, offsetY);
+                this.drawByteRanges(data.chunkedRanges, cellWidth, barHeight, offsetX, offsetY, 'byte range(s) with chunking');
+            }
+
+            getActualCellPositions(data, params) {
+                return [...data.actualCells].map(key => {
+                    const [x, y, z] = key.split(',').map(Number);
+                    return this.visualizer.getGlobalPosition(x, y, z, params);
+                });
+            }
+
+            drawLinearChunkedCells(params, data, positionToCell, spatialChunkColorMap, 
+                                 cellWidth, barHeight, offsetX, offsetY, sizeX, sizeY, sizeZ) {
+                const [chunkSizeX, chunkSizeY] = params.chunk;
+                const chunksX = Math.ceil(sizeX / chunkSizeX);
+                const chunksY = Math.ceil(sizeY / chunkSizeY);
+                const chunksZ3D = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
+                const totalChunks3D = chunksX * chunksY * chunksZ3D;
+
+                for (let i = 0; i < data.totalCells; i++) {
+                    const color = this.getChunkedCellColor(i, positionToCell, spatialChunkColorMap, 
+                                                        params, chunkSizeX, chunkSizeY, totalChunks3D, data.totalCells);
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillRect(offsetX + i * cellWidth, offsetY, cellWidth + 0.5, barHeight);
+                }
+            }
+
+            getChunkedCellColor(cellIndex, positionToCell, spatialChunkColorMap, params, chunkSizeX, chunkSizeY, totalChunks3D, totalCells) {
+                const cell = positionToCell.get(cellIndex);
+                if (cell && spatialChunkColorMap) {
+                    const chunkCX = Math.floor(cell.x / chunkSizeX);
+                    const chunkCY = Math.floor(cell.y / chunkSizeY);
+                    const chunkCZ = Math.floor(cell.z / Math.max(1, params.chunk[2]));
+                    const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
+                    const colorIndex = spatialChunkColorMap.get(chunkKey);
+
+                    if (colorIndex !== undefined) {
+                        return this.visualizer.getColorForLinearPosition(colorIndex, totalChunks3D - 1);
+                    }
+                    return '#333';
+                }
+                return this.visualizer.getColorForLinearPosition(cellIndex, totalCells);
+            }
+
+            drawLinearChunkedHighlights(params, cellWidth, barHeight, offsetX, offsetY) {
+                const effectiveChunk = this.visualizer.getEffectiveChunk();
+
+                if (effectiveChunk) {
+                    const chunkRange = this.visualizer.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
+                    const showOutline = !this.visualizer.selectionState.hoveredCell;
+                    this.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, showOutline);
                 }
             }
         }
@@ -1454,6 +2074,14 @@
                 this.chunkPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
                 this.cellPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
                 this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+
+                // Initialize linearization engine
+                this.linearizationEngine = new LinearizationEngine(
+                    this.linearizationCache,
+                    this.positionCache,
+                    this.chunkPositionCache,
+                    this.cellPositionCache
+                );
 
                 // Initialize app state after loading from localStorage
                 this.loadSettings();
@@ -1850,8 +2478,26 @@
                 this.interactionManager = new InteractionManager(this, this.canvases, this.tooltipManager);
 
                 this.contexts = {};
+                this.renderers = {};
+                
                 for (const [key, canvas] of Object.entries(this.canvases)) {
                     this.contexts[key] = canvas.getContext('2d');
+
+                    // Create specialized renderers
+                    switch(key) {
+                        case 'spatialUnchunked':
+                            this.renderers[key] = new SpatialUnchunkedRenderer(canvas, this.contexts[key], this);
+                            break;
+                        case 'spatialChunked':
+                            this.renderers[key] = new SpatialChunkedRenderer(canvas, this.contexts[key], this);
+                            break;
+                        case 'linearUnchunked':
+                            this.renderers[key] = new LinearUnchunkedRenderer(canvas, this.contexts[key], this);
+                            break;
+                        case 'linearChunked':
+                            this.renderers[key] = new LinearChunkedRenderer(canvas, this.contexts[key], this);
+                            break;
+                    }
 
                     // Add mouse interaction for spatial and linear views
                     if (key.startsWith('spatial') || key.startsWith('linear')) {
@@ -1998,208 +2644,25 @@
                 };
             }
 
+            // Delegate to LinearizationEngine methods
             linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-                const key = `${x},${y},${z},${sizeX},${sizeY},${sizeZ},${algorithm}`;
-                if (this.linearizationCache.has(key)) {
-                    return this.linearizationCache.get(key);
-                }
-
-                let result;
-
-                switch(algorithm) {
-                    case 'row-major':
-                        result = x + y * sizeX + z * sizeX * sizeY;
-                        break;
-
-                    case 'col-major':
-                        result = y + x * sizeY + z * sizeX * sizeY;
-                        break;
-
-                    case 'z-order':
-                        if (sizeZ > 0) {
-                            result = this.mortonEncode3D(x, y, z);
-                        } else {
-                            result = this.mortonEncode2D(x, y);
-                        }
-                        break;
-
-                    case 'hilbert':
-                        if (sizeZ > 0) {
-                            // For 3D, use simple layer-based approach
-                            result = z * sizeX * sizeY + this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
-                        } else {
-                            result = this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
-                        }
-                        break;
-
-                    default:
-                        result = x + y * sizeX + z * sizeX * sizeY;
-                }
-
-                this.linearizationCache.set(key, result);
-                return result;
+                return this.linearizationEngine.linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm);
             }
 
-            // Get the linearization position of a cell within its chunk
             getIntraChunkPosition(x, y, z, params) {
-                const [chunkX, chunkY, chunkZ] = params.chunk;
-                const localX = x % chunkX;
-                const localY = y % chunkY;
-                const localZ = z % chunkZ;
-                const rawPos = this.linearizeCoordinate(localX, localY, localZ, chunkX, chunkY, chunkZ, params.cellAlgorithm);
-
-                // For non-sequential cell algorithms, normalize to ensure contiguous chunk ranges
-                if (params.cellAlgorithm === 'z-order' || params.cellAlgorithm === 'hilbert') {
-                    const cacheKey = `cell-${params.cellAlgorithm}-${chunkX}-${chunkY}-${chunkZ}`;
-
-                    if (!this.cellPositionCache.has(cacheKey)) {
-                        const allCellPositions = [];
-                        for (let cz = 0; cz < Math.max(1, chunkZ); cz++) {
-                            for (let cy = 0; cy < chunkY; cy++) {
-                                for (let cx = 0; cx < chunkX; cx++) {
-                                    const pos = this.linearizeCoordinate(cx, cy, cz, chunkX, chunkY, chunkZ, params.cellAlgorithm);
-                                    allCellPositions.push(pos);
-                                }
-                            }
-                        }
-                        allCellPositions.sort((a, b) => a - b);
-
-                        const positionMap = new Map();
-                        allCellPositions.forEach((pos, seqIndex) => {
-                            positionMap.set(pos, seqIndex);
-                        });
-                        this.cellPositionCache.set(cacheKey, positionMap);
-                    }
-
-                    const positionMap = this.cellPositionCache.get(cacheKey);
-                    if (!positionMap || !positionMap.has(rawPos)) {
-                        throw new Error(`Cell position ${rawPos} not found in cache for algorithm ${params.cellAlgorithm}`);
-                    }
-                    return positionMap.get(rawPos);
-                }
-
-                return rawPos;
+                return this.linearizationEngine.getIntraChunkPosition(x, y, z, params);
             }
 
-            // Get the linearization position of a chunk
             getInterChunkPosition(x, y, z, params) {
-                const [sizeX, sizeY, sizeZ] = params.size;
-                const [chunkX, chunkY, chunkZ] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkX);
-                const chunksY = Math.ceil(sizeY / chunkY);
-                const chunksZ = Math.ceil(sizeZ / chunkZ);
-                const chunkCX = Math.floor(x / chunkX);
-                const chunkCY = Math.floor(y / chunkY);
-                const chunkCZ = Math.floor(z / chunkZ);
-                return this.linearizeCoordinate(chunkCX, chunkCY, chunkCZ, chunksX, chunksY, chunksZ, params.chunkAlgorithm);
+                return this.linearizationEngine.getInterChunkPosition(x, y, z, params);
             }
 
-            // Get the normalized chunk position (sequential order 0,1,2,3... regardless of algorithm)
             getNormalizedChunkPosition(x, y, z, params) {
-                const rawChunkPos = this.getInterChunkPosition(x, y, z, params);
-
-                if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
-                    // For non-sequential algorithms, normalize to get proper sequential positions
-                    const [sizeX, sizeY] = params.size;
-                    const [chunkX, chunkY] = params.chunk;
-                    const chunksX = Math.ceil(sizeX / chunkX);
-                    const chunksY = Math.ceil(sizeY / chunkY);
-
-                    // Create mapping once and cache it
-                    const cacheKey = `${params.chunkAlgorithm}-${chunksX}-${chunksY}`;
-
-                    if (!this.chunkPositionCache.has(cacheKey)) {
-                        const allChunkPositions = [];
-                        for (let cy = 0; cy < chunksY; cy++) {
-                            for (let cx = 0; cx < chunksX; cx++) {
-                                const tempX = cx * chunkX;
-                                const tempY = cy * chunkY;
-                                const pos = this.getInterChunkPosition(tempX, tempY, 0, params);
-                                allChunkPositions.push({pos, index: cy * chunksX + cx, cx, cy});
-                            }
-                        }
-                        allChunkPositions.sort((a, b) => a.pos - b.pos);
-
-                        const positionMap = new Map();
-                        const coordMap = new Map();
-                        allChunkPositions.forEach((item, seqIndex) => {
-                            positionMap.set(item.pos, seqIndex);
-                            coordMap.set(seqIndex, {cx: item.cx, cy: item.cy});
-                        });
-                        this.chunkPositionCache.set(cacheKey, positionMap);
-                        this.chunkPositionCache.set(cacheKey + '-coords', coordMap);
-                    }
-
-                    const positionMap = this.chunkPositionCache.get(cacheKey);
-                    if (!positionMap || !positionMap.has(rawChunkPos)) {
-                        throw new Error(`Chunk position ${rawChunkPos} not found in cache for algorithm ${params.chunkAlgorithm}`);
-                    }
-                    return positionMap.get(rawChunkPos);
-                }
-
-                return rawChunkPos;
+                return this.linearizationEngine.getNormalizedChunkPosition(x, y, z, params);
             }
 
-            // Get the global linearization position combining both levels
             getGlobalPosition(x, y, z, params) {
-                const [sizeX, sizeY] = params.size;
-                const [chunkX, chunkY, chunkZ] = params.chunk;
-
-                // Calculate which chunk this cell belongs to
-                const chunkCX = Math.floor(x / chunkX);
-                const chunkCY = Math.floor(y / chunkY);
-                const chunkCZ = Math.floor(z / Math.max(1, chunkZ));
-
-                // Get linearization position of chunks
-                const chunksX = Math.ceil(sizeX / chunkX);
-                const chunksY = Math.ceil(sizeY / chunkY);
-                const normalizedChunkPos = this.getNormalizedChunkPosition(x, y, z, params);
-
-                // Calculate how many actual cells are in chunks before this one
-                let cellsBeforeThisChunk = 0;
-                for (let i = 0; i < normalizedChunkPos; i++) {
-                    // Convert sequential chunk index back to chunk coordinates
-                    const chunksX = Math.ceil(sizeX / chunkX);
-                    const chunksY = Math.ceil(sizeY / chunkY);
-
-                    let tempCX, tempCY;
-
-                    // Use the same algorithm as chunk linearization to get proper coordinates
-                    if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
-                        // For non-sequential algorithms, use the cached coordinate mapping
-                        const cacheKey = `${params.chunkAlgorithm}-${chunksX}-${chunksY}`;
-                        const coordCacheKey = cacheKey + '-coords';
-
-                        // The coordinate cache must exist from getNormalizedChunkPosition call
-                        const coordMap = this.chunkPositionCache.get(coordCacheKey);
-                        if (!coordMap || !coordMap.has(i)) {
-                            throw new Error(`Coordinate mapping not found for sequential position ${i} in algorithm ${params.chunkAlgorithm}`);
-                        }
-                        const coords = coordMap.get(i);
-                        tempCX = coords.cx;
-                        tempCY = coords.cy;
-                    } else if (params.chunkAlgorithm === 'col-major') {
-                        // Column-major: increment Y first, then X
-                        tempCX = Math.floor(i / chunksY);
-                        tempCY = i % chunksY;
-                    } else {
-                        // Row-major (default): increment X first, then Y
-                        tempCY = Math.floor(i / chunksX);
-                        tempCX = i % chunksX;
-                    }
-
-                    // Calculate actual cells in this chunk
-                    const startX = tempCX * chunkX;
-                    const startY = tempCY * chunkY;
-                    const endX = Math.min(startX + chunkX, sizeX);
-                    const endY = Math.min(startY + chunkY, sizeY);
-                    const actualCellsInChunk = (endX - startX) * (endY - startY);
-                    cellsBeforeThisChunk += actualCellsInChunk;
-                }
-
-                // Add position within current chunk
-                const intraChunkPos = this.getIntraChunkPosition(x, y, z, params);
-                return cellsBeforeThisChunk + intraChunkPos;
+                return this.linearizationEngine.getGlobalPosition(x, y, z, params);
             }
 
             // Get the range of global positions for a chunk
@@ -2227,54 +2690,6 @@
                 };
             }
 
-            mortonEncode2D(x, y) {
-                let result = 0;
-                for (let i = 0; i < 16; i++) {
-                    result |= ((x & (1 << i)) << i) | ((y & (1 << i)) << (i + 1));
-                }
-                return result;
-            }
-
-            mortonEncode3D(x, y, z) {
-                let result = 0;
-                for (let i = 0; i < 10; i++) {
-                    result |= ((x & (1 << i)) << (2 * i)) |
-                              ((y & (1 << i)) << (2 * i + 1)) |
-                              ((z & (1 << i)) << (2 * i + 2));
-                }
-                return result;
-            }
-
-            // Calculate the next power of 2 that is >= n
-            nextPowerOfTwo(n) {
-                if (n <= 1) return 1;
-                return Math.pow(2, Math.ceil(Math.log2(n)));
-            }
-
-            hilbertEncode2D(x, y, maxDim) {
-                // Hilbert curves require power-of-2 dimensions for correctness
-                const n = this.nextPowerOfTwo(maxDim);
-
-                let d = 0;
-                for (let s = n / 2; s > 0; s /= 2) {
-                    let rx = (x & s) > 0 ? 1 : 0;
-                    let ry = (y & s) > 0 ? 1 : 0;
-                    d += s * s * ((3 * rx) ^ ry);
-                    [x, y] = this.hilbertRotate(s, x, y, rx, ry);
-                }
-                return d;
-            }
-
-            hilbertRotate(n, x, y, rx, ry) {
-                if (ry === 0) {
-                    if (rx === 1) {
-                        x = n - 1 - x;
-                        y = n - 1 - y;
-                    }
-                    [x, y] = [y, x];
-                }
-                return [x, y];
-            }
 
             getChunkIndex(x, y, z, params) {
                 const [chunkX, chunkY, chunkZ] = params.chunk;
@@ -2288,8 +2703,7 @@
             }
 
             getColorForLinearPosition(position, maxPosition) {
-                // Cache color calculations for performance
-                const key = `${position}-${maxPosition}`;
+                const key = CacheKeyGenerator.createColorKey(position, maxPosition);
 
                 const cachedColor = this.colorCache.get(key);
                 if (cachedColor) {
@@ -2299,7 +2713,6 @@
                 const hue = 120 - (position / maxPosition) * 120; // Green to red (120° to 0°)
                 const color = `hsl(${hue}, 70%, 50%)`;
 
-                // The LRUCache handles eviction automatically.
                 this.colorCache.set(key, color);
                 return color;
             }
@@ -2326,11 +2739,11 @@
                 const data = this.calculateData(params);
                 this.currentData = data; // Store for mouse interactions
 
-                // Draw all views
-                this.drawSpatialUnchunked(params, data);
-                this.drawSpatialChunked(params, data);
-                this.drawLinearUnchunked(params, data);
-                this.drawLinearChunked(params, data);
+                // Draw all views using specialized renderers
+                this.renderers.spatialUnchunked.render(params, data);
+                this.renderers.spatialChunked.render(params, data);
+                this.renderers.linearUnchunked.render(params, data);
+                this.renderers.linearChunked.render(params, data);
 
                 // Update metrics
                 this.updateMetrics(data);
@@ -2432,126 +2845,13 @@
                 return ranges;
             }
 
-            drawSpatialUnchunked(params, data) {
-                const renderer = new BaseCanvasRenderer(this.canvases.spatialUnchunked, this.contexts.spatialUnchunked);
-                renderer.clearCanvas();
-
-                const [sizeX, sizeY, sizeZ] = params.size;
-                const { cellSize, offsetX, offsetY } = renderer.getSpatialCellLayout(sizeX, sizeY);
-
-                this.drawCellGrid(renderer, params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
-                this.drawSpatialHighlights(renderer, params, sizeX, sizeY, cellSize, offsetX, offsetY);
-                renderer.drawQueryRegionOutline(params.query, sizeX, sizeY, cellSize, offsetX, offsetY);
-            }
-
-            drawCellGrid(renderer, params, data, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                const { ctx } = renderer;
-                
-                // Skip rendering individual cells if they're too small to see
-                if (cellSize > CONFIG.MIN_CELL_SIZE) {
-                    this.drawDetailedCellGrid(renderer, params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
-                } else {
-                    // For very small cells, draw as a single gradient rectangle
-                    const gradient = ctx.createLinearGradient(offsetX, offsetY, offsetX + sizeX * cellSize, offsetY + sizeY * cellSize);
-                    gradient.addColorStop(0, '#00ff00');
-                    gradient.addColorStop(1, '#ff0000');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(offsetX, offsetY, sizeX * cellSize, sizeY * cellSize);
-                }
-            }
-
-            drawDetailedCellGrid(renderer, params, data, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                const { ctx } = renderer;
-                const { width: logicalWidth } = renderer.getLogicalDimensions();
-
-                // Use viewport-based rendering for medium-sized cells to improve performance
-                if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && data.totalCells > 1000) {
-                    // Calculate visible cell range for viewport optimization
-                    const startX = Math.max(0, Math.floor(-offsetX / cellSize));
-                    const endX = Math.min(sizeX, Math.ceil((logicalWidth - offsetX) / cellSize));
-                    const startY = Math.max(0, Math.floor(-offsetY / cellSize));
-                    const endY = Math.min(sizeY, Math.ceil((logicalWidth - offsetY) / cellSize));
-
-                    this.drawCellRange(ctx, params, data, startX, endX, startY, endY, cellSize, offsetX, offsetY);
-                } else {
-                    // Full rendering for larger cells or smaller datasets
-                    this.drawCellRange(ctx, params, data, 0, sizeX, 0, sizeY, cellSize, offsetX, offsetY);
-                }
-            }
-
-            drawCellRange(ctx, params, data, startX, endX, startY, endY, cellSize, offsetX, offsetY) {
-                for (let y = startY; y < endY; y++) {
-                    for (let x = startX; x < endX; x++) {
-                        const globalPos = this.getGlobalPosition(x, y, 0, params);
-                        const color = this.getColorForLinearPosition(globalPos, data.totalCells - 1);
-
-                        ctx.fillStyle = color;
-                        ctx.fillRect(
-                            offsetX + x * cellSize,
-                            offsetY + y * cellSize,
-                            cellSize - 1,
-                            cellSize - 1
-                        );
-                    }
-                }
-            }
-
-            drawSpatialHighlights(renderer, params, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                const effectiveCell = this.getEffectiveCell();
-                const effectiveChunk = this.getEffectiveChunk();
-
-                // Handle individual cell highlighting
-                if (cellSize > CONFIG.MIN_CELL_SIZE && effectiveCell) {
-                    renderer.drawCellHighlight(effectiveCell.x, effectiveCell.y, cellSize, offsetX, offsetY);
-                }
-
-                // Highlight all cells in effective chunk (when no individual cell is highlighted)
-                if (effectiveChunk && !effectiveCell) {
-                    this.drawChunkCellHighlights(renderer, params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY);
-                }
-            }
-
-            drawChunkCellHighlights(renderer, params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                const { ctx } = renderer;
-                const [chunkSizeX, chunkSizeY] = params.chunk;
-
-                for (let y = 0; y < sizeY; y++) {
-                    for (let x = 0; x < sizeX; x++) {
-                        const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(x, y, chunkSizeX, chunkSizeY);
-
-                        if (chunkCoords.x === effectiveChunk.x && chunkCoords.y === effectiveChunk.y) {
-                            // Draw semi-transparent white overlay
-                            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                            ctx.fillRect(
-                                offsetX + x * cellSize,
-                                offsetY + y * cellSize,
-                                cellSize - 1,
-                                cellSize - 1
-                            );
-                        }
-                    }
-                }
-            }
-
-            drawSpatialChunked(params, data) {
-                const renderer = new BaseCanvasRenderer(this.canvases.spatialChunked, this.contexts.spatialChunked);
-                renderer.clearCanvas();
-
-                const [sizeX, sizeY, sizeZ] = params.size;
-                const [chunkX, chunkY] = params.chunk;
-                const { cellSize, offsetX, offsetY } = renderer.getSpatialCellLayout(sizeX, sizeY);
-
-                const chunkColorMap = this.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
-                this.drawChunkGrid(renderer, params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY);
-                this.drawChunkedViewHighlights(renderer, params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
-            }
 
             getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ) {
                 const [chunkX, chunkY] = params.chunk;
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
                 const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
-                const cacheKey = `${chunksX},${chunksY},${chunksZ},${params.chunkAlgorithm}`;
+                const cacheKey = CacheKeyGenerator.createChunkColorMapKey(chunksX, chunksY, chunksZ, params.chunkAlgorithm);
 
                 let chunkColorMap = this.positionCache.get(cacheKey);
                 if (!chunkColorMap) {
@@ -2582,206 +2882,12 @@
                 return chunkColorMap;
             }
 
-            drawChunkGrid(renderer, params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY) {
-                const { ctx } = renderer;
-                const { width: logicalWidth, height: logicalHeight } = renderer.getLogicalDimensions();
-                const [chunkX, chunkY] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkX);
-                const chunksY = Math.ceil(sizeY / chunkY);
-                const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
-
-                // Apply viewport optimization for large chunk arrays
-                const { startChunkX, endChunkX, startChunkY, endChunkY } = this.getChunkViewport(
-                    chunksX, chunksY, cellSize, chunkX, chunkY, offsetX, offsetY, logicalWidth, logicalHeight
-                );
-
-                const totalChunks = chunksX * chunksY * chunksZ;
-
-                for (let chunkCY = startChunkY; chunkCY < endChunkY; chunkCY++) {
-                    for (let chunkCX = startChunkX; chunkCX < endChunkX; chunkCX++) {
-                        this.drawSingleChunk(ctx, chunkColorMap, chunkCX, chunkCY, totalChunks, 
-                                           params, sizeX, sizeY, cellSize, offsetX, offsetY);
-                    }
-                }
-            }
-
-            getChunkViewport(chunksX, chunksY, cellSize, chunkX, chunkY, offsetX, offsetY, logicalWidth, logicalHeight) {
-                if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && chunksX * chunksY > 100) {
-                    return {
-                        startChunkX: Math.max(0, Math.floor(-offsetX / (chunkX * cellSize))),
-                        endChunkX: Math.min(chunksX, Math.ceil((logicalWidth - offsetX) / (chunkX * cellSize))),
-                        startChunkY: Math.max(0, Math.floor(-offsetY / (chunkY * cellSize))),
-                        endChunkY: Math.min(chunksY, Math.ceil((logicalHeight - offsetY) / (chunkY * cellSize)))
-                    };
-                }
-                return { startChunkX: 0, endChunkX: chunksX, startChunkY: 0, endChunkY: chunksY };
-            }
-
-            drawSingleChunk(ctx, chunkColorMap, chunkCX, chunkCY, totalChunks, params, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                const [chunkX, chunkY] = params.chunk;
-                const chunkCZ = 0; // For 2D spatial view, we show Z=0 slice
-                const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
-                const colorIndex = chunkColorMap.get(chunkKey);
-                const color = this.getColorForLinearPosition(colorIndex, totalChunks - 1);
-
-                const bounds = CoordinateUtils.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
-                const chunkPixelWidth = (bounds.endX - bounds.startX) * cellSize;
-                const chunkPixelHeight = (bounds.endY - bounds.startY) * cellSize;
-
-                // Draw chunk fill
-                ctx.fillStyle = color;
-                ctx.fillRect(
-                    offsetX + bounds.startX * cellSize,
-                    offsetY + bounds.startY * cellSize,
-                    chunkPixelWidth,
-                    chunkPixelHeight
-                );
-
-                // Draw chunk border
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(
-                    offsetX + bounds.startX * cellSize,
-                    offsetY + bounds.startY * cellSize,
-                    chunkPixelWidth,
-                    chunkPixelHeight
-                );
-            }
-
-            drawChunkedViewHighlights(renderer, params, data, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                const effectiveCell = this.getEffectiveCell();
-                const effectiveChunk = this.getEffectiveChunk();
-                const [chunkX, chunkY] = params.chunk;
-
-                // Highlight chunk when there's an effective cell
-                if (effectiveCell) {
-                    const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
-                    const bounds = CoordinateUtils.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
-                    renderer.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', null);
-                }
-
-                // Draw query region outline around touched chunks
-                this.drawTouchedChunksOutline(renderer, data, params, sizeX, sizeY, cellSize, offsetX, offsetY);
-
-                // Highlight effective chunk
-                if (effectiveChunk && !effectiveCell) {
-                    const bounds = CoordinateUtils.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
-                    renderer.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
-                }
-            }
-
-            drawTouchedChunksOutline(renderer, data, params, sizeX, sizeY, cellSize, offsetX, offsetY) {
-                if (data.touchedChunks.size === 0) return;
-
-                const { ctx } = renderer;
-                const [chunkX, chunkY] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkX);
-
-                // Find bounding box of all touched chunks
-                let minChunkX = Infinity, minChunkY = Infinity;
-                let maxChunkX = -Infinity, maxChunkY = -Infinity;
-
-                data.touchedChunks.forEach(chunkIdx => {
-                    const chunkCY = Math.floor(chunkIdx / chunksX);
-                    const chunkCX = chunkIdx % chunksX;
-                    minChunkX = Math.min(minChunkX, chunkCX);
-                    minChunkY = Math.min(minChunkY, chunkCY);
-                    maxChunkX = Math.max(maxChunkX, chunkCX);
-                    maxChunkY = Math.max(maxChunkY, chunkCY);
-                });
-
-                // Draw single rectangle around all touched chunks
-                const startX = minChunkX * chunkX;
-                const startY = minChunkY * chunkY;
-                const endX = Math.min((maxChunkX + 1) * chunkX, sizeX);
-                const endY = Math.min((maxChunkY + 1) * chunkY, sizeY);
-
-                ctx.strokeStyle = '#4a9eff';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(
-                    offsetX + startX * cellSize,
-                    offsetY + startY * cellSize,
-                    (endX - startX) * cellSize - 1,
-                    (endY - startY) * cellSize - 1
-                );
-            }
-
-            drawLinearUnchunked(params, data) {
-                const renderer = new BaseCanvasRenderer(this.canvases.linearUnchunked, this.contexts.linearUnchunked);
-                renderer.clearCanvas();
-
-                const { cellWidth, barHeight, offsetX, offsetY } = renderer.getLinearBarLayout(data.totalCells);
-                
-                // Draw main cell bar
-                renderer.drawLinearBar(cellWidth, barHeight, offsetX, offsetY, data.totalCells, 
-                                    (i, total) => this.getColorForLinearPosition(i, total));
-
-                // Highlight requested cells
-                const requestedPositions = this.getRequestedCellPositions(data, params);
-                renderer.highlightLinearCells(requestedPositions, cellWidth, barHeight, offsetX, offsetY);
-
-                // Draw highlights
-                this.drawLinearUnchunkedHighlights(renderer, params, cellWidth, barHeight, offsetX, offsetY);
-
-                // Draw byte ranges
-                renderer.drawByteRanges(data.unchunkedRanges, cellWidth, barHeight, offsetX, offsetY, 'byte range(s)');
-            }
-
-            getRequestedCellPositions(data, params) {
-                return [...data.requestedCells].map(key => {
-                    const [x, y, z] = key.split(',').map(Number);
-                    return this.getGlobalPosition(x, y, z, params);
-                });
-            }
-
-            drawLinearUnchunkedHighlights(renderer, params, cellWidth, barHeight, offsetX, offsetY) {
-                const effectiveCell = this.getEffectiveCell();
-                const effectiveChunk = this.getEffectiveChunk();
-
-                // Highlight effective chunk range
-                if (effectiveChunk) {
-                    const chunkRange = this.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
-                    renderer.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, !effectiveCell);
-                }
-
-                // Highlight effective cell (should be drawn last to be on top)
-                if (effectiveCell) {
-                    const pos = this.getGlobalPosition(effectiveCell.x, effectiveCell.y, 0, params);
-                    renderer.ctx.strokeStyle = '#fff';
-                    renderer.ctx.lineWidth = 3;
-                    renderer.ctx.strokeRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
-                }
-            }
-
-            drawLinearChunked(params, data) {
-                const renderer = new BaseCanvasRenderer(this.canvases.linearChunked, this.contexts.linearChunked);
-                renderer.clearCanvas();
-
-                const { cellWidth, barHeight, offsetX, offsetY } = renderer.getLinearBarLayout(data.totalCells);
-                const [sizeX, sizeY, sizeZ] = params.size;
-
-                // Get position-to-cell mapping and chunk color map
-                const positionToCell = this.getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ);
-                const spatialChunkColorMap = this.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
-
-                // Draw cells colored by chunk
-                this.drawLinearChunkedCells(renderer, params, data, positionToCell, spatialChunkColorMap, 
-                                          cellWidth, barHeight, offsetX, offsetY, sizeX, sizeY, sizeZ);
-
-                // Highlight actual cells read (amplification)
-                const actualCellPositions = this.getActualCellPositions(data, params);
-                renderer.highlightLinearCells(actualCellPositions, cellWidth, barHeight, offsetX, offsetY);
-
-                // Draw chunk highlights
-                this.drawLinearChunkedHighlights(renderer, params, cellWidth, barHeight, offsetX, offsetY);
-
-                // Draw byte ranges
-                renderer.drawByteRanges(data.chunkedRanges, cellWidth, barHeight, offsetX, offsetY, 'byte range(s) with chunking');
-            }
 
             getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
-                const cacheKey = `${sizeX},${sizeY},${params.cellAlgorithm},${params.chunkAlgorithm},${chunkSizeX},${chunkSizeY}`;
+                const cacheKey = CacheKeyGenerator.createPositionToCellMapKey(
+                    sizeX, sizeY, params.cellAlgorithm, params.chunkAlgorithm, chunkSizeX, chunkSizeY
+                );
                 
                 let positionToCell = this.positionCache.get(cacheKey);
                 if (!positionToCell) {
@@ -2797,61 +2903,6 @@
                     this.positionCache.set(cacheKey, positionToCell);
                 }
                 return positionToCell;
-            }
-
-            getActualCellPositions(data, params) {
-                return [...data.actualCells].map(key => {
-                    const [x, y, z] = key.split(',').map(Number);
-                    return this.getGlobalPosition(x, y, z, params);
-                });
-            }
-
-            drawLinearChunkedCells(renderer, params, data, positionToCell, spatialChunkColorMap, 
-                                 cellWidth, barHeight, offsetX, offsetY, sizeX, sizeY, sizeZ) {
-                const { ctx } = renderer;
-                const [chunkSizeX, chunkSizeY] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkSizeX);
-                const chunksY = Math.ceil(sizeY / chunkSizeY);
-                const chunksZ3D = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
-                const totalChunks3D = chunksX * chunksY * chunksZ3D;
-
-                for (let i = 0; i < data.totalCells; i++) {
-                    const color = this.getChunkedCellColor(i, positionToCell, spatialChunkColorMap, 
-                                                        params, chunkSizeX, chunkSizeY, totalChunks3D, data.totalCells);
-                    ctx.fillStyle = color;
-                    // Remove gaps between cells by adding a small overlap
-                    ctx.fillRect(offsetX + i * cellWidth, offsetY, cellWidth + 0.5, barHeight);
-                }
-            }
-
-            getChunkedCellColor(cellIndex, positionToCell, spatialChunkColorMap, params, chunkSizeX, chunkSizeY, totalChunks3D, totalCells) {
-                const cell = positionToCell.get(cellIndex);
-                if (cell && spatialChunkColorMap) {
-                    const chunkCX = Math.floor(cell.x / chunkSizeX);
-                    const chunkCY = Math.floor(cell.y / chunkSizeY);
-                    const chunkCZ = Math.floor(cell.z / Math.max(1, params.chunk[2]));
-                    const chunkKey = `${chunkCX},${chunkCY},${chunkCZ}`;
-                    const colorIndex = spatialChunkColorMap.get(chunkKey);
-
-                    if (colorIndex !== undefined) {
-                        return this.getColorForLinearPosition(colorIndex, totalChunks3D - 1);
-                    } else {
-                        return '#333'; // Fallback for invalid chunks
-                    }
-                } else {
-                    // Fallback to gradient if position mapping fails
-                    return this.getColorForLinearPosition(cellIndex, totalCells);
-                }
-            }
-
-            drawLinearChunkedHighlights(renderer, params, cellWidth, barHeight, offsetX, offsetY) {
-                const effectiveChunk = this.getEffectiveChunk();
-
-                if (effectiveChunk) {
-                    const chunkRange = this.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
-                    const showOutline = !this.selectionState.hoveredCell;
-                    renderer.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, showOutline);
-                }
             }
 
             updateMetrics(data) {
