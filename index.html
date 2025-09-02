@@ -387,12 +387,9 @@
             border-radius: 3px;
             margin-right: 8px;
             vertical-align: middle;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgb(255, 255, 255);
         }
 
-        .highlight-blue {
-            background: rgba(74, 158, 255, 0.7);
-        }
 
         .highlight-white {
             background: rgba(255, 255, 255, 0.4);
@@ -400,6 +397,7 @@
 
         .gradient-example {
             background: linear-gradient(90deg, #00ff00, #ff0000);
+            border: none;
         }
 
         /* Hide Z dimension controls for now */
@@ -712,7 +710,7 @@
                 <h3>Color Coding</h3>
                 <p><span class="color-example gradient-example"></span><strong>Green to Red Gradient:</strong> Shows the linearization order from first (green) to last (red) in memory. This helps you understand how different algorithms arrange data sequentially.</p>
 
-                <p><span class="color-example highlight-blue"></span><strong>Blue Highlights:</strong> Indicate query regions and all cells that need to be read to satisfy the query. This includes both requested cells and extra cells read due to chunking.</p>
+                <p><span class="color-example query-legend"></span><strong>Blue Outlines:</strong> Indicate query regions and all cells that need to be read to satisfy the query. This includes both requested cells and extra cells read due to chunking.</p>
 
                 <p><span class="color-example highlight-white"></span><strong>White Overlays:</strong> Show currently hovered elements. Direct hovers have both overlay and outline, while cross-highlighted elements show only the overlay.</p>
             </div>
@@ -1917,15 +1915,15 @@
             highlightLinearChunks(params, data, cellWidth, barHeight, offsetX, offsetY) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
                 const chunksX = Math.ceil(params.size[0] / chunkSizeX);
-                
+
                 const allPositions = [];
-                
+
                 // Get all positions from all touched chunks
                 data.touchedChunks.forEach(chunkIdx => {
                     const chunkCY = Math.floor(chunkIdx / chunksX);
                     const chunkCX = chunkIdx % chunksX;
                     const chunkRange = this.visualizer.getChunkGlobalRange(chunkCX, chunkCY, params);
-                    
+
                     if (chunkRange && chunkRange.positions.length > 0) {
                         allPositions.push(...chunkRange.positions);
                     }
