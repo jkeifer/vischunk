@@ -517,7 +517,7 @@
 
                 <div class="preset-controls">
                     <div class="control-group">
-                        <label>Scenario Presets</label>
+                        <label for="presets">Scenario Presets</label>
                         <select id="presets">
                             <option value="user">User Settings</option>
                         </select>
@@ -529,23 +529,23 @@
                 <div class="control-section">
                 <div class="section-title">Array Settings</div>
                 <div class="control-group">
-                    <label>Array Size X</label>
+                    <label for="sizeX">Array Size X</label>
                     <input type="number" id="sizeX" min="1" max="64" value="16">
                 </div>
 
                 <div class="control-group">
-                    <label>Array Size Y</label>
+                    <label for="sizeY">Array Size Y</label>
                     <input type="number" id="sizeY" min="1" max="64" value="16">
                 </div>
 
                 <div class="control-group z-control" id="arraySizeZGroup">
-                    <label>Array Size Z</label>
+                    <label for="sizeZ">Array Size Z</label>
                     <input type="number" id="sizeZ" min="1" max="16" value="1">
                 </div>
 
 
                 <div class="control-group">
-                    <label>Cell Linearization (within chunk)</label>
+                    <label for="cellAlgorithm">Cell Linearization (within chunk)</label>
                     <select id="cellAlgorithm">
                         <option value="row-major">Row-Major</option>
                         <option value="col-major">Column-Major</option>
@@ -558,22 +558,22 @@
             <div class="control-section">
                 <div class="section-title">Chunk Settings</div>
                 <div class="control-group">
-                    <label>Chunk Size X</label>
+                    <label for="chunkX">Chunk Size X</label>
                     <input type="number" id="chunkX" min="1" max="64" value="4">
                 </div>
 
                 <div class="control-group">
-                    <label>Chunk Size Y</label>
+                    <label for="chunkY">Chunk Size Y</label>
                     <input type="number" id="chunkY" min="1" max="64" value="4">
                 </div>
 
                 <div class="control-group z-control" id="chunkZGroup">
-                    <label>Chunk Size Z</label>
+                    <label for="chunkZ">Chunk Size Z</label>
                     <input type="number" id="chunkZ" min="1" max="16" value="1">
                 </div>
 
                 <div class="control-group">
-                    <label>Chunk Linearization</label>
+                    <label for="chunkAlgorithm">Chunk Linearization</label>
                     <select id="chunkAlgorithm">
                         <option value="row-major">Row-Major</option>
                         <option value="col-major">Column-Major</option>
@@ -586,19 +586,19 @@
             <div class="control-section">
                 <div class="section-title">Query Region</div>
                 <div class="range-group">
-                    <label>X:</label>
+                    <label for="queryX1">X:</label>
                     <input type="number" id="queryX1" min="0" value="3">
                     <span>to</span>
                     <input type="number" id="queryX2" min="0" value="10">
                 </div>
                 <div class="range-group">
-                    <label>Y:</label>
+                    <label for="queryY1">Y:</label>
                     <input type="number" id="queryY1" min="0" value="3">
                     <span>to</span>
                     <input type="number" id="queryY2" min="0" value="10">
                 </div>
                 <div class="range-group z-control" id="zRange">
-                    <label>Z:</label>
+                    <label for="queryZ1">Z:</label>
                     <input type="number" id="queryZ1" min="0" value="0">
                     <span>to</span>
                     <input type="number" id="queryZ2" min="0" value="0">
