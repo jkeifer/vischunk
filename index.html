@@ -783,9 +783,48 @@
             MAX_CANVAS_SIZE: 400,      // Maximum canvas size in pixels
             MIN_CELL_SIZE: 2,          // Minimum cell size for drawing details
             VIEWPORT_CELL_SIZE: 8,     // Cell size threshold for viewport rendering
-            MAX_CACHE_SIZE: 10000,     // Maximum entries in color cache before clearing
+            LRU_CONFIG_CACHE_SIZE: 50, // Max number of recent configurations to cache (for chunk/cell mappings)
+            LRU_DETAIL_CACHE_SIZE: 20000, // Max number of recent detail items to cache (colors, coordinates)
             RESIZE_DEBOUNCE_MS: 150    // Debounce timeout for resize events
         };
+
+        class LRUCache {
+            constructor(maxSize) {
+                this.maxSize = maxSize;
+                this.cache = new Map();
+            }
+
+            get(key) {
+                const item = this.cache.get(key);
+                if (item) {
+                    // Refresh it by deleting and re-setting
+                    this.cache.delete(key);
+                    this.cache.set(key, item);
+                }
+                return item;
+            }
+
+            set(key, value) {
+                // Delete old entry if it exists to refresh its position
+                if (this.cache.has(key)) {
+                    this.cache.delete(key);
+                }
+                // If the cache is full, evict the least recently used item
+                else if (this.cache.size >= this.maxSize && this.maxSize > 0) {
+                    // .keys().next().value gets the first (oldest) key in the Map
+                    this.cache.delete(this.cache.keys().next().value);
+                }
+                this.cache.set(key, value);
+            }
+
+            has(key) {
+                return this.cache.has(key);
+            }
+
+            clear() {
+                this.cache.clear();
+            }
+        }
 
         const PRESET_CONFIGS = {
             'small-tiles': {
@@ -873,9 +912,14 @@
             constructor() {
                 this.hoveredCell = null;
                 this.hoveredChunk = null;
-                this.linearizationCache = new Map();
-                this.positionCache = new Map();
                 this.lastCanvasSize = new Map();
+
+                // Initialize caches with LRU policy
+                this.linearizationCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+                this.positionCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+                this.chunkPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
+                this.cellPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
+                this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
 
                 // Initialize app state after loading from localStorage
                 this.loadSettings();
@@ -889,15 +933,19 @@
                 const oldState = { ...this.state };
                 this.state = { ...this.state, ...newState };
 
-                // Clear caches if structural changes occurred
+                // Caches are now managed by LRU policy.
+                // Clearing them on every structural change would prevent the performance benefit
+                // of switching back and forth between recent settings.
                 const structuralChanges = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ'];
                 const hasStructuralChanges = structuralChanges.some(key =>
                     key in newState && oldState[key] !== newState[key]
                 );
 
-                if (hasStructuralChanges) {
-                    this.clearCaches();
-                }
+                // The clearCaches method is kept in case a full reset is ever needed,
+                // but it's no longer called on every settings change.
+                // if (hasStructuralChanges) {
+                //     this.clearCaches();
+                // }
             }
 
             // Full UI update cycle - call this after setState() when you want to update the display
@@ -1428,7 +1476,6 @@
                 // For non-sequential cell algorithms, normalize to ensure contiguous chunk ranges
                 if (params.cellAlgorithm === 'z-order' || params.cellAlgorithm === 'hilbert') {
                     const cacheKey = `cell-${params.cellAlgorithm}-${chunkX}-${chunkY}-${chunkZ}`;
-                    if (!this.cellPositionCache) this.cellPositionCache = new Map();
 
                     if (!this.cellPositionCache.has(cacheKey)) {
                         const allCellPositions = [];
@@ -1485,7 +1532,6 @@
 
                     // Create mapping once and cache it
                     const cacheKey = `${params.chunkAlgorithm}-${chunksX}-${chunksY}`;
-                    if (!this.chunkPositionCache) this.chunkPositionCache = new Map();
 
                     if (!this.chunkPositionCache.has(cacheKey)) {
                         const allChunkPositions = [];
@@ -1669,19 +1715,16 @@
             getColorForLinearPosition(position, maxPosition) {
                 // Cache color calculations for performance
                 const key = `${position}-${maxPosition}`;
-                if (!this.colorCache) this.colorCache = new Map();
 
-                if (this.colorCache.has(key)) {
-                    return this.colorCache.get(key);
+                const cachedColor = this.colorCache.get(key);
+                if (cachedColor) {
+                    return cachedColor;
                 }
 
                 const hue = 120 - (position / maxPosition) * 120; // Green to red (120° to 0°)
                 const color = `hsl(${hue}, 70%, 50%)`;
 
-                // Limit cache size to prevent memory leaks
-                if (this.colorCache.size > CONFIG.MAX_CACHE_SIZE) {
-                    this.colorCache.clear();
-                }
+                // The LRUCache handles eviction automatically.
                 this.colorCache.set(key, color);
                 return color;
             }
