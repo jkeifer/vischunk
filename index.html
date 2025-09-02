@@ -2632,12 +2632,16 @@
                 if (effectiveChunk) {
                     const chunkRange = this.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
                     if (chunkRange) {
+                        // Calculate the actual pixel width based on the chunk's cell count
+                        const chunkCellCount = chunkRange.positions.length;
+                        const chunkPixelWidth = chunkCellCount * cellWidth;
+
                         // Background highlight for chunk range
                         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                         ctx.fillRect(
                             offsetX + chunkRange.min * cellWidth,
                             offsetY,
-                            (chunkRange.max - chunkRange.min + 1) * cellWidth,
+                            chunkPixelWidth,
                             barHeight
                         );
 
@@ -2648,7 +2652,7 @@
                             ctx.strokeRect(
                                 offsetX + chunkRange.min * cellWidth,
                                 offsetY,
-                                (chunkRange.max - chunkRange.min + 1) * cellWidth,
+                                chunkPixelWidth,
                                 barHeight
                             );
                         }
@@ -2773,12 +2777,16 @@
                 if (effectiveChunk) {
                     const chunkRange = this.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
                     if (chunkRange) {
+                        // Calculate the actual pixel width based on the chunk's cell count
+                        const chunkCellCount = chunkRange.positions.length;
+                        const chunkPixelWidth = chunkCellCount * cellWidth;
+
                         // Highlight chunk range with background
                         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
                         ctx.fillRect(
                             offsetX + chunkRange.min * cellWidth,
                             offsetY,
-                            (chunkRange.max - chunkRange.min + 1) * cellWidth,
+                            chunkPixelWidth,
                             barHeight
                         );
 
@@ -2789,7 +2797,7 @@
                             ctx.strokeRect(
                                 offsetX + chunkRange.min * cellWidth,
                                 offsetY,
-                                (chunkRange.max - chunkRange.min + 1) * cellWidth,
+                                chunkPixelWidth,
                                 barHeight
                             );
                         }
