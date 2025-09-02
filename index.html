@@ -650,7 +650,7 @@
         <h2>Simulation Visualizations</h2>
         <div class="spatial-views">
             <div class="viz-panel">
-                <div class="viz-title">Logical Array (Cell Linearization within Chunks)</div>
+                <div class="viz-title">Array Cells</div>
                 <div class="canvas-container">
                     <canvas id="spatial-unchunked"></canvas>
                 </div>
@@ -667,7 +667,7 @@
             </div>
 
             <div class="viz-panel">
-                <div class="viz-title">Chunked Array (Chunk Linearization)</div>
+                <div class="viz-title">Array Chunks</div>
                 <div class="canvas-container">
                     <canvas id="spatial-chunked"></canvas>
                 </div>
@@ -686,14 +686,14 @@
 
         <div class="linear-views">
             <div class="linear-viz">
-                <div class="viz-title">Linear Storage (Combined Linearization)</div>
+                <div class="viz-title">Storage Linearization — Cells</div>
                 <div class="canvas-container">
                     <canvas id="linear-unchunked"></canvas>
                 </div>
             </div>
 
             <div class="linear-viz">
-                <div class="viz-title">Linear Storage (Chunk-Colored View)</div>
+                <div class="viz-title">Storage Linearization — Chunks</div>
                 <div class="canvas-container">
                     <canvas id="linear-chunked"></canvas>
                 </div>
@@ -1252,15 +1252,15 @@
                     this.resizeCanvases();
                     this.update();
                 }, 0);
-                
+
                 this.resizeCanvases();
-                
+
                 // Simple, efficient resize handling
                 let resizeRAF = null;
-                
+
                 const handleResize = () => {
                     if (resizeRAF) return; // Prevent multiple concurrent updates
-                    
+
                     resizeRAF = requestAnimationFrame(() => {
                         const needsUpdate = this.resizeCanvases();
                         if (needsUpdate) {
@@ -1269,7 +1269,7 @@
                         resizeRAF = null;
                     });
                 };
-                
+
                 // Only use window resize - simpler and more reliable
                 window.addEventListener('resize', handleResize);
             }
@@ -1298,12 +1298,12 @@
                     const canvasContainer = canvas.parentElement; // .canvas-container
                     const vizPanel = canvasContainer.parentElement; // .viz-panel
                     const containerRect = vizPanel.getBoundingClientRect();
-                    
+
                     // Account for viz-panel padding (15px) and canvas-container padding (10px)
                     const vizPanelPadding = 15;
                     const canvasContainerPadding = 20; // 10px on each side
                     const totalPadding = vizPanelPadding * 2 + canvasContainerPadding;
-                    
+
                     const availableWidth = containerRect.width - totalPadding;
                     const size = Math.min(availableWidth, CONFIG.MAX_CANVAS_SIZE);
                     const lastSize = this.lastCanvasSize.get(key);
@@ -1321,12 +1321,12 @@
                     const canvasContainer = canvas.parentElement; // .canvas-container
                     const linearViz = canvasContainer.parentElement; // .linear-viz
                     const containerRect = linearViz.getBoundingClientRect();
-                    
+
                     // Account for linear-viz padding (15px) and canvas-container padding (10px)
                     const linearVizPadding = 15;
                     const canvasContainerPadding = 20; // 10px on each side
                     const totalPadding = linearVizPadding * 2 + canvasContainerPadding;
-                    
+
                     const width = containerRect.width - totalPadding;
                     const height = 120;
                     const lastSize = this.lastCanvasSize.get(key);
@@ -1962,7 +1962,7 @@
                         const endX = Math.min(sizeX, Math.ceil((logicalWidth - offsetX) / cellSize));
                         const startY = Math.max(0, Math.floor(-offsetY / cellSize));
                         const endY = Math.min(sizeY, Math.ceil((logicalHeight - offsetY) / cellSize));
-                        
+
                         for (let y = startY; y < endY; y++) {
                             for (let x = startX; x < endX; x++) {
                                 const globalPos = this.getGlobalPosition(x, y, 0, params);
@@ -2124,14 +2124,14 @@
                 // Draw each chunk as a solid rectangle
                 // Apply viewport optimization for large chunk arrays
                 let startChunkX = 0, endChunkX = chunksX, startChunkY = 0, endChunkY = chunksY;
-                
+
                 if (cellSize < CONFIG.VIEWPORT_CELL_SIZE && chunksX * chunksY > 100) {
                     startChunkX = Math.max(0, Math.floor(-offsetX / (chunkX * cellSize)));
                     endChunkX = Math.min(chunksX, Math.ceil((logicalWidth - offsetX) / (chunkX * cellSize)));
                     startChunkY = Math.max(0, Math.floor(-offsetY / (chunkY * cellSize)));
                     endChunkY = Math.min(chunksY, Math.ceil((logicalHeight - offsetY) / (chunkY * cellSize)));
                 }
-                
+
                 for (let chunkCY = startChunkY; chunkCY < endChunkY; chunkCY++) {
                     for (let chunkCX = startChunkX; chunkCX < endChunkX; chunkCX++) {
                         const chunkCZ = 0; // For 2D spatial view, we show Z=0 slice
