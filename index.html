@@ -1294,8 +1294,13 @@
             }
         }
 
-        class CoordinateUtils {
-            static getCanvasCoordinates(e, canvas) {
+        class CoordinateService {
+            constructor() {
+                this.cellLayoutCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
+                this.linearLayoutCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
+            }
+
+            getCanvasCoordinates(e, canvas) {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
@@ -1305,29 +1310,65 @@
                 };
             }
 
-            static getSpatialCellCoordinates(canvasX, canvasY, canvas, params) {
+            getSpatialCellLayout(canvas, sizeX, sizeY) {
+                const dpr = window.devicePixelRatio || 1;
+                const cacheKey = `${canvas.width}x${canvas.height}_${sizeX}x${sizeY}_${dpr}`;
+                if (this.cellLayoutCache.has(cacheKey)) {
+                    return this.cellLayoutCache.get(cacheKey);
+                }
+
+                const logicalWidth = canvas.width / dpr;
+                const logicalHeight = canvas.height / dpr;
+                const cellSize = Math.min(logicalWidth / sizeX, logicalHeight / sizeY) * 0.9;
+                const offsetX = (logicalWidth - sizeX * cellSize) / 2;
+                const offsetY = (logicalHeight - sizeY * cellSize) / 2;
+
+                const layout = { cellSize, offsetX, offsetY };
+                this.cellLayoutCache.set(cacheKey, layout);
+                return layout;
+            }
+
+            getSpatialCellCoordinates(canvasX, canvasY, canvas, params) {
                 const [sizeX, sizeY] = params.size;
-                const cellSize = Math.min(canvas.width / sizeX, canvas.height / sizeY) * 0.9;
-                const offsetX = (canvas.width - sizeX * cellSize) / 2;
-                const offsetY = (canvas.height - sizeY * cellSize) / 2;
                 
-                const cellX = Math.floor((canvasX - offsetX) / cellSize);
-                const cellY = Math.floor((canvasY - offsetY) / cellSize);
+                // Convert canvas coordinates to logical coordinates
+                const dpr = window.devicePixelRatio || 1;
+                const logicalX = canvasX / dpr;
+                const logicalY = canvasY / dpr;
+                
+                const { cellSize, offsetX, offsetY } = this.getSpatialCellLayout(canvas, sizeX, sizeY);
+                
+                const cellX = Math.floor((logicalX - offsetX) / cellSize);
+                const cellY = Math.floor((logicalY - offsetY) / cellSize);
                 
                 return {
                     cellX,
                     cellY,
-                    isValid: cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY
+                    isValid: cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY,
+                    layout: { cellSize, offsetX, offsetY }
                 };
             }
 
-            static getLinearCellCoordinates(canvasX, canvasY, canvas, data) {
-                const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
-                const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
-                const cellWidth = (logicalWidth - 40) / data.totalCells;
-                const offsetX = 20;
+            getLinearBarLayout(canvas, totalCells) {
+                const dpr = window.devicePixelRatio || 1;
+                const cacheKey = `linear_${canvas.width}x${canvas.height}_${totalCells}_${dpr}`;
+                if (this.linearLayoutCache.has(cacheKey)) {
+                    return this.linearLayoutCache.get(cacheKey);
+                }
+
+                const logicalWidth = canvas.width / dpr;
+                const cellWidth = (logicalWidth - 40) / totalCells;
                 const barHeight = 60;
+                const offsetX = 20;
                 const offsetY = 20;
+
+                const layout = { cellWidth, barHeight, offsetX, offsetY };
+                this.linearLayoutCache.set(cacheKey, layout);
+                return layout;
+            }
+
+            getLinearCellCoordinates(canvasX, canvasY, canvas, data) {
+                const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(canvas, data.totalCells);
                 
                 const dpr = window.devicePixelRatio || 1;
                 const logicalX = canvasX / dpr;
@@ -1339,11 +1380,12 @@
                 
                 return {
                     cellIndex,
-                    isValid: isInBar && isValidIndex
+                    isValid: isInBar && isValidIndex,
+                    layout: { cellWidth, barHeight, offsetX, offsetY }
                 };
             }
 
-            static getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY) {
+            getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY) {
                 const startX = chunkCX * chunkX;
                 const startY = chunkCY * chunkY;
                 const endX = Math.min(startX + chunkX, sizeX);
@@ -1351,13 +1393,19 @@
                 return { startX, startY, endX, endY };
             }
 
-            static getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY) {
+            getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY) {
                 return {
                     x: Math.floor(cellX / chunkX),
                     y: Math.floor(cellY / chunkY)
                 };
             }
+
+            clearCache() {
+                this.cellLayoutCache.clear();
+                this.linearLayoutCache.clear();
+            }
         }
+
 
         class TooltipContentGenerator {
             static generateCellTooltip(cell, params, visualizer) {
@@ -1369,7 +1417,7 @@
             static generateChunkTooltip(chunk, params, sizeX, sizeY, chunkX, chunkY, visualizer) {
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunkIdx = chunk.x + chunk.y * chunksX;
-                const bounds = CoordinateUtils.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
+                const bounds = visualizer.coordinateService.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
                 const interChunkPos = visualizer.getInterChunkPosition(bounds.startX, bounds.startY, 0, params);
                 
                 return `Chunk ${chunkIdx}: cells (${bounds.startX},${bounds.startY}) to (${bounds.endX - 1},${bounds.endY - 1}), Linear pos: ${interChunkPos}`;
@@ -1377,10 +1425,11 @@
         }
 
         class BaseCanvasRenderer {
-            constructor(canvas, context, visualizer) {
+            constructor(canvas, context, visualizer, coordinateService) {
                 this.canvas = canvas;
                 this.ctx = context;
                 this.visualizer = visualizer;
+                this.coordinateService = coordinateService;
             }
 
             getLogicalDimensions() {
@@ -1444,23 +1493,6 @@
                     (x2 - x1 + 1) * cellSize - 1,
                     (y2 - y1 + 1) * cellSize - 1
                 );
-            }
-
-            getSpatialCellLayout(sizeX, sizeY) {
-                const { width, height } = this.getLogicalDimensions();
-                const cellSize = Math.min(width / sizeX, height / sizeY) * 0.9;
-                const offsetX = (width - sizeX * cellSize) / 2;
-                const offsetY = (height - sizeY * cellSize) / 2;
-                return { cellSize, offsetX, offsetY };
-            }
-
-            getLinearBarLayout(totalCells) {
-                const { width } = this.getLogicalDimensions();
-                const cellWidth = (width - 40) / totalCells;
-                const barHeight = 60;
-                const offsetX = 20;
-                const offsetY = 20;
-                return { cellWidth, barHeight, offsetX, offsetY };
             }
 
             drawLinearBar(cellWidth, barHeight, offsetX, offsetY, totalCells, getColorForPosition) {
@@ -1550,7 +1582,7 @@
                 this.clearCanvas();
                 
                 const [sizeX, sizeY] = params.size;
-                const { cellSize, offsetX, offsetY } = this.getSpatialCellLayout(sizeX, sizeY);
+                const { cellSize, offsetX, offsetY } = this.coordinateService.getSpatialCellLayout(this.canvas, sizeX, sizeY);
 
                 this.drawCellGrid(params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
                 this.drawSpatialHighlights(params, sizeX, sizeY, cellSize, offsetX, offsetY);
@@ -1618,7 +1650,7 @@
 
                 for (let y = 0; y < sizeY; y++) {
                     for (let x = 0; x < sizeX; x++) {
-                        const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(x, y, chunkSizeX, chunkSizeY);
+                        const chunkCoords = this.coordinateService.getChunkCoordinatesFromCell(x, y, chunkSizeX, chunkSizeY);
 
                         if (chunkCoords.x === effectiveChunk.x && chunkCoords.y === effectiveChunk.y) {
                             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
@@ -1639,7 +1671,7 @@
                 this.clearCanvas();
                 
                 const [sizeX, sizeY, sizeZ] = params.size;
-                const { cellSize, offsetX, offsetY } = this.getSpatialCellLayout(sizeX, sizeY);
+                const { cellSize, offsetX, offsetY } = this.coordinateService.getSpatialCellLayout(this.canvas, sizeX, sizeY);
 
                 const chunkColorMap = this.visualizer.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
                 this.drawChunkGrid(params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY);
@@ -1647,24 +1679,34 @@
             }
 
             drawChunkGrid(params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY) {
+                const chunkGridInfo = this.calculateChunkGridInfo(params, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY);
+                
+                for (let chunkCY = chunkGridInfo.startChunkY; chunkCY < chunkGridInfo.endChunkY; chunkCY++) {
+                    for (let chunkCX = chunkGridInfo.startChunkX; chunkCX < chunkGridInfo.endChunkX; chunkCX++) {
+                        this.drawSingleChunk(chunkColorMap, chunkCX, chunkCY, chunkGridInfo.totalChunks, 
+                                           params, sizeX, sizeY, cellSize, offsetX, offsetY);
+                    }
+                }
+            }
+
+            calculateChunkGridInfo(params, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY) {
                 const [chunkX, chunkY] = params.chunk;
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
                 const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
 
                 const { width: logicalWidth, height: logicalHeight } = this.getLogicalDimensions();
-                const { startChunkX, endChunkX, startChunkY, endChunkY } = this.getChunkViewport(
+                const viewport = this.getChunkViewport(
                     chunksX, chunksY, cellSize, chunkX, chunkY, offsetX, offsetY, logicalWidth, logicalHeight
                 );
 
-                const totalChunks = chunksX * chunksY * chunksZ;
-
-                for (let chunkCY = startChunkY; chunkCY < endChunkY; chunkCY++) {
-                    for (let chunkCX = startChunkX; chunkCX < endChunkX; chunkCX++) {
-                        this.drawSingleChunk(chunkColorMap, chunkCX, chunkCY, totalChunks, 
-                                           params, sizeX, sizeY, cellSize, offsetX, offsetY);
-                    }
-                }
+                return {
+                    chunksX,
+                    chunksY,
+                    chunksZ,
+                    totalChunks: chunksX * chunksY * chunksZ,
+                    ...viewport
+                };
             }
 
             getChunkViewport(chunksX, chunksY, cellSize, chunkX, chunkY, offsetX, offsetY, logicalWidth, logicalHeight) {
@@ -1686,7 +1728,7 @@
                 const colorIndex = chunkColorMap.get(chunkKey);
                 const color = this.visualizer.getColorForLinearPosition(colorIndex, totalChunks - 1);
 
-                const bounds = CoordinateUtils.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
+                const bounds = this.coordinateService.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
                 const chunkPixelWidth = (bounds.endX - bounds.startX) * cellSize;
                 const chunkPixelHeight = (bounds.endY - bounds.startY) * cellSize;
 
@@ -1714,15 +1756,15 @@
                 const [chunkX, chunkY] = params.chunk;
 
                 if (effectiveCell) {
-                    const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
-                    const bounds = CoordinateUtils.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
+                    const chunkCoords = this.coordinateService.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
+                    const bounds = this.coordinateService.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
                     this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', null);
                 }
 
                 this.drawTouchedChunksOutline(data, params, sizeX, sizeY, cellSize, offsetX, offsetY);
 
                 if (effectiveChunk && !effectiveCell) {
-                    const bounds = CoordinateUtils.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
+                    const bounds = this.coordinateService.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
                     this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
                 }
             }
@@ -1765,7 +1807,7 @@
             render(params, data) {
                 this.clearCanvas();
 
-                const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(data.totalCells);
+                const { cellWidth, barHeight, offsetX, offsetY } = this.coordinateService.getLinearBarLayout(this.canvas, data.totalCells);
                 
                 this.drawLinearBar(cellWidth, barHeight, offsetX, offsetY, data.totalCells, 
                                 (i, total) => this.visualizer.getColorForLinearPosition(i, total));
@@ -1806,7 +1848,7 @@
             render(params, data) {
                 this.clearCanvas();
 
-                const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(data.totalCells);
+                const { cellWidth, barHeight, offsetX, offsetY } = this.coordinateService.getLinearBarLayout(this.canvas, data.totalCells);
                 const [sizeX, sizeY, sizeZ] = params.size;
 
                 const positionToCell = this.visualizer.getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ);
@@ -1873,12 +1915,164 @@
             }
         }
 
+        class InteractionStrategy {
+            constructor(visualizer, tooltipManager) {
+                this.visualizer = visualizer;
+                this.tooltipManager = tooltipManager;
+            }
+
+            // Template method for handling mouse moves
+            handleMove(e, canvas, canvasKey) {
+                const coords = this.visualizer.coordinateService.getCanvasCoordinates(e, canvas);
+                const targetInfo = this.getTargetInfo(coords, canvas, canvasKey);
+                
+                if (targetInfo) {
+                    this.updateHoverState(targetInfo);
+                    this.showTooltip(e, targetInfo);
+                } else {
+                    this.clearHover();
+                }
+            }
+
+            // Template method for handling clicks
+            handleClick(e, canvas, canvasKey) {
+                const coords = this.visualizer.coordinateService.getCanvasCoordinates(e, canvas);
+                const targetInfo = this.getTargetInfo(coords, canvas, canvasKey);
+                
+                this.handleSelectionLogic(e, targetInfo);
+            }
+
+            // Abstract methods to be implemented by subclasses
+            getTargetInfo(coords, canvas, canvasKey) {
+                throw new Error('getTargetInfo must be implemented by subclass');
+            }
+
+            updateHoverState(targetInfo) {
+                if (targetInfo.cell) {
+                    this.visualizer.selectionState.setHoveredCell(targetInfo.cell);
+                }
+                if (targetInfo.chunk) {
+                    this.visualizer.selectionState.setHoveredChunk(targetInfo.chunk);
+                }
+            }
+
+            showTooltip(e, targetInfo) {
+                const params = this.visualizer.getParameters();
+                if (targetInfo.cell && targetInfo.usesCellTooltip) {
+                    this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip(targetInfo.cell, params, this.visualizer));
+                } else if (targetInfo.chunk) {
+                    const [sizeX, sizeY] = params.size;
+                    const [chunkX, chunkY] = params.chunk;
+                    this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip(targetInfo.chunk, params, sizeX, sizeY, chunkX, chunkY, this.visualizer));
+                }
+            }
+
+            clearHover() {
+                this.visualizer.selectionState.clearHover();
+                this.tooltipManager.hide();
+            }
+
+            handleSelectionLogic(e, targetInfo) {
+                const clickedCell = targetInfo?.cell;
+                const clickedChunk = targetInfo?.chunk;
+
+                if (clickedCell || clickedChunk) {
+                    // Check if clicking on already selected item to deselect
+                    if (this.visualizer.selectionState.isSelected(clickedCell, clickedChunk)) {
+                        this.visualizer.selectionState.clearSelection();
+                        this.tooltipManager.hide();
+                    } else {
+                        // Select new item
+                        this.visualizer.selectionState.setSelectedCell(clickedCell);
+                        this.visualizer.selectionState.setSelectedChunk(clickedChunk);
+                        this.showTooltip(e, targetInfo);
+                    }
+                } else {
+                    // Clicked outside any item - clear selection
+                    this.visualizer.selectionState.clearSelection();
+                    this.tooltipManager.hide();
+                }
+            }
+        }
+
+        class SpatialUnchunkedStrategy extends InteractionStrategy {
+            getTargetInfo(coords, canvas, canvasKey) {
+                const params = this.visualizer.getParameters();
+                const { cellX, cellY, isValid } = this.visualizer.coordinateService.getSpatialCellCoordinates(coords.x, coords.y, canvas, params);
+                
+                if (!isValid) return null;
+
+                const [chunkX, chunkY] = params.chunk;
+                const cell = { x: cellX, y: cellY };
+                const chunk = this.visualizer.coordinateService.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
+                
+                return { cell, chunk, usesCellTooltip: true };
+            }
+        }
+
+        class SpatialChunkedStrategy extends InteractionStrategy {
+            getTargetInfo(coords, canvas, canvasKey) {
+                const params = this.visualizer.getParameters();
+                const { cellX, cellY, isValid } = this.visualizer.coordinateService.getSpatialCellCoordinates(coords.x, coords.y, canvas, params);
+                
+                if (!isValid) return null;
+
+                const [chunkX, chunkY] = params.chunk;
+                const chunk = this.visualizer.coordinateService.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
+                
+                return { chunk, usesCellTooltip: false };
+            }
+
+            updateHoverState(targetInfo) {
+                this.visualizer.selectionState.setHoveredChunk(targetInfo.chunk);
+                this.visualizer.selectionState.setHoveredCell(null);
+            }
+        }
+
+        class LinearStrategy extends InteractionStrategy {
+            getTargetInfo(coords, canvas, canvasKey) {
+                const data = this.visualizer.currentData;
+                if (!data) return null;
+
+                const { cellIndex, isValid } = this.visualizer.coordinateService.getLinearCellCoordinates(coords.x, coords.y, canvas, data);
+                if (!isValid) return null;
+
+                const params = this.visualizer.getParameters();
+                const [sizeX, sizeY] = params.size;
+                const [chunkX, chunkY] = params.chunk;
+                const foundCell = this.visualizer.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
+                
+                if (!foundCell) return null;
+
+                const cell = { x: foundCell.x, y: foundCell.y };
+                const chunk = { x: foundCell.chunkX, y: foundCell.chunkY };
+                const usesCellTooltip = canvasKey === 'linearUnchunked';
+                
+                return { cell, chunk, usesCellTooltip };
+            }
+
+            updateHoverState(targetInfo) {
+                const usesCell = targetInfo.usesCellTooltip;
+                this.visualizer.selectionState.setHoveredCell(usesCell ? targetInfo.cell : null);
+                this.visualizer.selectionState.setHoveredChunk(targetInfo.chunk);
+            }
+        }
+
         class InteractionManager {
             constructor(visualizer, canvases, tooltipManager) {
                 this.visualizer = visualizer;
                 this.canvases = canvases;
                 this.tooltipManager = tooltipManager;
                 this.mouseThrottle = false;
+
+                // Initialize strategies
+                const linearStrategy = new LinearStrategy(visualizer, tooltipManager);
+                this.strategies = {
+                    spatialUnchunked: new SpatialUnchunkedStrategy(visualizer, tooltipManager),
+                    spatialChunked: new SpatialChunkedStrategy(visualizer, tooltipManager),
+                    linearUnchunked: linearStrategy,
+                    linearChunked: linearStrategy
+                };
             }
 
             handleMouseMove(e, canvasKey) {
@@ -1895,83 +2089,14 @@
                 });
 
                 const canvas = this.canvases[canvasKey];
-                const coords = CoordinateUtils.getCanvasCoordinates(e, canvas);
-                const { x, y } = coords;
-
-                const params = this.visualizer.getParameters();
-                const [sizeX, sizeY, sizeZ] = params.size;
-                const [chunkX, chunkY] = params.chunk;
-
-                if (canvasKey === 'spatialUnchunked') {
-                    this.handleSpatialUnchunkedMove(e, canvas, params, x, y, chunkX, chunkY);
-                } else if (canvasKey === 'spatialChunked') {
-                    this.handleSpatialChunkedMove(e, canvas, params, x, y, sizeX, sizeY, chunkX, chunkY);
-                } else if (canvasKey.startsWith('linear')) {
-                    this.handleLinearMove(e, canvas, canvasKey, params, x, y, sizeX, sizeY, chunkX, chunkY);
-                }
-
-                this.visualizer.update();
-            }
-
-            handleSpatialUnchunkedMove(e, canvas, params, x, y, chunkX, chunkY) {
-                const spatialCoords = CoordinateUtils.getSpatialCellCoordinates(x, y, canvas, params);
+                const strategy = this.strategies[canvasKey];
                 
-                if (spatialCoords.isValid) {
-                    const { cellX, cellY } = spatialCoords;
-                    this.visualizer.selectionState.setHoveredCell({ x: cellX, y: cellY });
-                    const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
-                    this.visualizer.selectionState.setHoveredChunk(chunkCoords);
-                    this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip({ x: cellX, y: cellY }, params, this.visualizer));
-                } else {
-                    this.visualizer.selectionState.clearHover();
-                    this.tooltipManager.hide();
+                if (strategy) {
+                    strategy.handleMove(e, canvas, canvasKey);
+                    this.visualizer.update();
                 }
             }
 
-            handleSpatialChunkedMove(e, canvas, params, x, y, sizeX, sizeY, chunkX, chunkY) {
-                const spatialCoords = CoordinateUtils.getSpatialCellCoordinates(x, y, canvas, params);
-                
-                if (spatialCoords.isValid) {
-                    const { cellX, cellY } = spatialCoords;
-                    const chunkCoords = CoordinateUtils.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
-                    this.visualizer.selectionState.setHoveredChunk(chunkCoords);
-                    this.visualizer.selectionState.setHoveredCell(null);
-                    this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip(chunkCoords, params, sizeX, sizeY, chunkX, chunkY, this.visualizer));
-                } else {
-                    this.visualizer.selectionState.setHoveredChunk(null);
-                    this.tooltipManager.hide();
-                }
-            }
-
-            handleLinearMove(e, canvas, canvasKey, params, x, y, sizeX, sizeY, chunkX, chunkY) {
-                const data = this.visualizer.currentData;
-                if (!data) return;
-
-                const linearCoords = CoordinateUtils.getLinearCellCoordinates(x, y, canvas, data);
-                
-                if (linearCoords.isValid) {
-                    const { cellIndex } = linearCoords;
-                    const foundCell = this.visualizer.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
-
-                    if (foundCell) {
-                        if (canvasKey === 'linearUnchunked') {
-                            this.visualizer.selectionState.setHoveredCell({ x: foundCell.x, y: foundCell.y });
-                            this.visualizer.selectionState.setHoveredChunk({ x: foundCell.chunkX, y: foundCell.chunkY });
-                            this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip({ x: foundCell.x, y: foundCell.y }, params, this.visualizer));
-                        } else {
-                            this.visualizer.selectionState.setHoveredCell(null);
-                            this.visualizer.selectionState.setHoveredChunk({ x: foundCell.chunkX, y: foundCell.chunkY });
-                            this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip({ x: foundCell.chunkX, y: foundCell.chunkY }, params, sizeX, sizeY, chunkX, chunkY, this.visualizer));
-                        }
-                    } else {
-                        this.visualizer.selectionState.clearHover();
-                        this.tooltipManager.hide();
-                    }
-                } else {
-                    this.visualizer.selectionState.clearHover();
-                    this.tooltipManager.hide();
-                }
-            }
 
             handleMouseLeave() {
                 this.visualizer.selectionState.clearHover();
@@ -1987,483 +2112,26 @@
 
             handleMouseClick(e, canvasKey) {
                 const canvas = this.canvases[canvasKey];
-                const coords = CoordinateUtils.getCanvasCoordinates(e, canvas);
-                const { x, y } = coords;
-
-                const params = this.visualizer.getParameters();
-                const [sizeX, sizeY, sizeZ] = params.size;
-                const [chunkX, chunkY] = params.chunk;
-
-                const { clickedCell, clickedChunk } = this.getClickTargets(canvasKey, canvas, x, y, params, sizeX, sizeY, chunkX, chunkY);
-
-                this.handleSelectionLogic(e, clickedCell, clickedChunk, params, sizeX, sizeY, chunkX, chunkY);
-                this.visualizer.update();
-            }
-
-            getClickTargets(canvasKey, canvas, x, y, params, sizeX, sizeY, chunkX, chunkY) {
-                let clickedCell = null;
-                let clickedChunk = null;
-
-                if (canvasKey === 'spatialUnchunked') {
-                    const spatialCoords = CoordinateUtils.getSpatialCellCoordinates(x, y, canvas, params);
-                    if (spatialCoords.isValid) {
-                        const { cellX, cellY } = spatialCoords;
-                        clickedCell = { x: cellX, y: cellY };
-                        clickedChunk = CoordinateUtils.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
-                    }
-                } else if (canvasKey === 'spatialChunked') {
-                    const spatialCoords = CoordinateUtils.getSpatialCellCoordinates(x, y, canvas, params);
-                    if (spatialCoords.isValid) {
-                        const { cellX, cellY } = spatialCoords;
-                        clickedChunk = CoordinateUtils.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
-                    }
-                } else if (canvasKey.startsWith('linear')) {
-                    const data = this.visualizer.currentData;
-                    if (data) {
-                        const linearCoords = CoordinateUtils.getLinearCellCoordinates(x, y, canvas, data);
-                        if (linearCoords.isValid) {
-                            const { cellIndex } = linearCoords;
-                            const foundCell = this.visualizer.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
-                            if (foundCell) {
-                                if (canvasKey === 'linearUnchunked') {
-                                    clickedCell = { x: foundCell.x, y: foundCell.y };
-                                }
-                                clickedChunk = { x: foundCell.chunkX, y: foundCell.chunkY };
-                            }
-                        }
-                    }
-                }
-
-                return { clickedCell, clickedChunk };
-            }
-
-            handleSelectionLogic(e, clickedCell, clickedChunk, params, sizeX, sizeY, chunkX, chunkY) {
-                if (clickedCell || clickedChunk) {
-                    // Check if clicking on already selected item to deselect
-                    if (this.visualizer.selectionState.isSelected(clickedCell, clickedChunk)) {
-                        this.visualizer.selectionState.clearSelection();
-                        this.tooltipManager.hide();
-                    } else {
-                        // Select new item
-                        this.visualizer.selectionState.setSelectedCell(clickedCell);
-                        this.visualizer.selectionState.setSelectedChunk(clickedChunk);
-
-                        // Update tooltip content
-                        if (clickedCell) {
-                            this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip(clickedCell, params, this.visualizer));
-                        } else if (clickedChunk) {
-                            this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip(clickedChunk, params, sizeX, sizeY, chunkX, chunkY, this.visualizer));
-                        }
-                    }
-                } else {
-                    // Clicked outside any item - clear selection
-                    this.visualizer.selectionState.clearSelection();
-                    this.tooltipManager.hide();
+                const strategy = this.strategies[canvasKey];
+                
+                if (strategy) {
+                    strategy.handleClick(e, canvas, canvasKey);
+                    this.visualizer.update();
                 }
             }
+
         }
 
-        class DataVisualizer {
-            constructor() {
-                this.selectionState = new SelectionState();
+        // Global coordinate service instance
+        let coordinateService;
+
+        class CanvasManager {
+            constructor(visualizer) {
+                this.visualizer = visualizer;
+                this.canvases = {};
+                this.contexts = {};
+                this.renderers = {};
                 this.lastCanvasSize = new Map();
-
-                // Initialize caches with LRU policy
-                this.linearizationCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
-                this.positionCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
-                this.chunkPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
-                this.cellPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
-                this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
-
-                // Initialize linearization engine
-                this.linearizationEngine = new LinearizationEngine(
-                    this.linearizationCache,
-                    this.positionCache,
-                    this.chunkPositionCache,
-                    this.cellPositionCache
-                );
-
-                // Initialize app state after loading from localStorage
-                this.loadSettings();
-                this.initializeControls();
-                this.initializeCanvases();
-                this.renderUI();
-                this.update();
-            }
-
-
-            getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY) {
-                for (let cy = 0; cy < sizeY; cy++) {
-                    for (let cx = 0; cx < sizeX; cx++) {
-                        const globalPos = this.getGlobalPosition(cx, cy, 0, params);
-                        if (globalPos === cellIndex) {
-                            return { 
-                                x: cx, 
-                                y: cy,
-                                chunkX: Math.floor(cx / chunkX),
-                                chunkY: Math.floor(cy / chunkY)
-                            };
-                        }
-                    }
-                }
-                return null;
-            }
-
-            setState(newState) {
-                const oldState = { ...this.state };
-                this.state = { ...this.state, ...newState };
-
-                // Caches are now managed by LRU policy.
-                // Clearing them on every structural change would prevent the performance benefit
-                // of switching back and forth between recent settings.
-                const structuralChanges = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ'];
-                const hasStructuralChanges = structuralChanges.some(key =>
-                    key in newState && oldState[key] !== newState[key]
-                );
-
-                // The clearCaches method is kept in case a full reset is ever needed,
-                // but it's no longer called on every settings change.
-                // if (hasStructuralChanges) {
-                //     this.clearCaches();
-                // }
-            }
-
-            // Full UI update cycle - call this after setState() when you want to update the display
-            updateUI() {
-                this.renderUI();
-                this.updateDOMConstraints();
-                this.updateResetButton();
-                this.updatePresetDisplay();
-                this.update();
-            }
-
-            // Update HTML form constraints based on current state (no state changes)
-            updateDOMConstraints() {
-                const { sizeX, sizeY, sizeZ } = this.state;
-
-                document.getElementById('chunkX').max = sizeX;
-                document.getElementById('chunkY').max = sizeY;
-                document.getElementById('chunkZ').max = Math.max(1, sizeZ);
-
-                document.getElementById('queryX1').max = Math.max(0, sizeX - 1);
-                document.getElementById('queryX2').max = Math.max(0, sizeX - 1);
-                document.getElementById('queryY1').max = Math.max(0, sizeY - 1);
-                document.getElementById('queryY2').max = Math.max(0, sizeY - 1);
-                document.getElementById('queryZ1').max = Math.max(0, sizeZ - 1);
-                document.getElementById('queryZ2').max = Math.max(0, sizeZ - 1);
-            }
-
-            // Sync UI elements to match current state
-            renderUI() {
-                Object.keys(this.state).forEach(key => {
-                    if (key === 'currentPreset') {
-                        const presetsEl = document.getElementById('presets');
-                        if (presetsEl) presetsEl.value = this.state[key];
-                    } else {
-                        const element = document.getElementById(key);
-                        if (element) element.value = this.state[key];
-                    }
-                });
-            }
-
-            // Clear all caches when structural changes occur
-            clearCaches() {
-                this.linearizationCache.clear();
-                this.positionCache.clear();
-                if (this.chunkPositionCache) this.chunkPositionCache.clear();
-                if (this.cellPositionCache) this.cellPositionCache.clear();
-                if (this.colorCache) this.colorCache.clear();
-            }
-
-            populatePresetOptions() {
-                const presetsSelect = document.getElementById('presets');
-
-                // Add preset options dynamically
-                Object.keys(PRESET_CONFIGS).forEach(presetKey => {
-                    const option = document.createElement('option');
-                    option.value = presetKey;
-                    option.textContent = this.getPresetDisplayName(presetKey, true);
-                    presetsSelect.appendChild(option);
-                });
-            }
-
-            initializeControls() {
-                // Populate preset options
-                this.populatePresetOptions();
-
-                const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ',
-                                 'chunkX', 'chunkY', 'chunkZ',
-                                 'queryX1', 'queryX2', 'queryY1', 'queryY2',
-                                 'queryZ1', 'queryZ2'];
-
-                controls.forEach(id => {
-                    const element = document.getElementById(id);
-                    element.addEventListener('change', (e) => {
-                        let value = e.target.type === 'number' ?
-                            parseInt(e.target.value) :
-                            e.target.value;
-
-                        // Validate numeric inputs
-                        if (e.target.type === 'number') {
-                            if (isNaN(value)) {
-                                console.warn(`Invalid input value: ${e.target.value}, resetting to 1`);
-                                value = 1;
-                            } else {
-                                // Apply proper constraints based on field type
-                                if (id.startsWith('size') || id.startsWith('chunk')) {
-                                    value = Math.max(1, value); // Dimensions and chunk sizes must be >= 1
-                                } else {
-                                    value = Math.max(0, value); // Query ranges can start at 0
-                                }
-
-                                // Apply upper limits
-                                if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
-                                if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
-                            }
-                        }
-
-                        this.setState({ [id]: value });
-                        this.updateUI();
-                        this.saveSettings(); // Explicit save for user input
-                    });
-                });
-
-                // Add preset handler
-                document.getElementById('presets').addEventListener('change', (e) => {
-                    this.loadPreset(e.target.value);
-                    this.saveSettings(); // Save when user explicitly changes preset
-                });
-
-                // Add reset button handler
-                document.getElementById('resetButton').addEventListener('click', () => {
-                    this.resetSettings();
-                });
-
-                this.updateConstraints();
-                this.updateResetButton();
-            }
-
-            saveSettings() {
-                // Save current preset settings (excluding currentPreset from the preset data)
-                const currentSettings = { ...this.state };
-                delete currentSettings.currentPreset;
-
-                // Only save preset if it differs from canonical version
-                const canonicalSettings = this.getCanonicalPreset(this.state.currentPreset);
-                const hasChanges = canonicalSettings && Object.keys(canonicalSettings).some(key =>
-                    currentSettings[key] !== canonicalSettings[key]
-                );
-
-                if (hasChanges) {
-                    // Preset is modified - save it
-                    this.appState.presets[this.state.currentPreset] = currentSettings;
-                } else {
-                    // Preset matches canonical - remove any saved version
-                    delete this.appState.presets[this.state.currentPreset];
-                }
-
-                // Always save the current preset selection
-                this.appState.currentPreset = this.state.currentPreset;
-
-                // Save entire app state
-                localStorage.setItem('vischunk-app-state', JSON.stringify(this.appState));
-            }
-
-            loadSettings() {
-                try {
-                    const saved = localStorage.getItem('vischunk-app-state');
-                    if (saved) {
-                        this.appState = JSON.parse(saved);
-                    } else {
-                        this.appState = DEFAULT_APP_STATE;
-                    }
-                } catch (error) {
-                    console.warn('Failed to load settings from localStorage:', error);
-                    this.appState = DEFAULT_APP_STATE;
-                }
-
-                // Initialize current visualization state from the selected preset
-                const currentPreset = this.appState.currentPreset;
-                const presetSettings = this.appState.presets[currentPreset] ||
-                                     this.getCanonicalPreset(currentPreset);
-
-                this.state = {
-                    ...presetSettings,
-                    currentPreset: currentPreset
-                };
-            }
-
-            resetSettings() {
-                const presetName = this.state.currentPreset;
-
-                // Remove user modifications for this preset
-                if (this.appState.presets[presetName]) {
-                    delete this.appState.presets[presetName];
-                }
-
-                // Load canonical preset
-                const canonicalSettings = this.getCanonicalPreset(presetName);
-                if (canonicalSettings) {
-                    this.setState({ ...canonicalSettings, currentPreset: presetName });
-                    this.updateUI();
-                }
-
-                // Save the reset (removal of modifications)
-                this.saveSettings();
-            }
-
-            updateResetButton() {
-                const resetButton = document.getElementById('resetButton');
-                const canonical = this.getCanonicalPreset(this.state.currentPreset);
-
-                // Check if current state differs from canonical preset
-                const isChanged = canonical && Object.keys(canonical).some(key =>
-                    this.state[key] !== canonical[key]
-                );
-
-                resetButton.disabled = !isChanged;
-                resetButton.style.opacity = isChanged ? '1' : '0.5';
-            }
-
-            // Get canonical preset settings (without user modifications)
-            getCanonicalPreset(presetName) {
-                if (presetName === 'user') {
-                    return DEFAULT_USER_SETTINGS;
-                } else if (PRESET_CONFIGS[presetName]) {
-                    const { name, ...settings } = PRESET_CONFIGS[presetName];
-                    return settings;
-                }
-                return null;
-            }
-
-            // Get current preset settings (with user modifications if they exist)
-            getCurrentPresetSettings(presetName) {
-                return this.appState.presets[presetName] || this.getCanonicalPreset(presetName);
-            }
-
-            // Get display name for a preset
-            getPresetDisplayName(presetName, includeModificationIndicator = false) {
-                let baseName = presetName === 'user' ? 'User Settings' :
-                              PRESET_CONFIGS[presetName]?.name || presetName;
-
-                if (includeModificationIndicator && this.isPresetModified(presetName)) {
-                    baseName += ' *';
-                }
-
-                return baseName;
-            }
-
-            isPresetModified(presetName) {
-                if (presetName === 'user') {
-                    // User preset is never shown as "modified" since it's inherently custom
-                    return false;
-                } else if (PRESET_CONFIGS[presetName]) {
-                    // Named presets are modified if they exist in appState.presets
-                    return !!(this.appState && this.appState.presets && this.appState.presets[presetName]);
-                }
-
-                return false;
-            }
-
-            updatePresetDisplay() {
-                const presetsSelect = document.getElementById('presets');
-
-                // Update all preset option text to show/hide asterisks
-                presetsSelect.querySelectorAll('option').forEach(option => {
-                    option.textContent = this.getPresetDisplayName(option.value, true);
-                });
-            }
-
-            loadPreset(presetName) {
-                // Update app state to track current preset selection
-                this.appState.currentPreset = presetName;
-
-                const presetSettings = this.getCurrentPresetSettings(presetName);
-                if (presetSettings) {
-                    this.setState({ ...presetSettings, currentPreset: presetName });
-                    this.updateUI();
-                }
-
-                // Only save when this is a user-initiated preset change, not during initialization
-                // The preset selection is already tracked in this.appState.currentPreset
-                // and will be saved when the user makes actual changes
-            }
-
-            updateConstraints() {
-
-                // Validate and clamp state values to reasonable limits
-                let updates = {};
-                let { sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, queryX1, queryX2, queryY1, queryY2, queryZ1, queryZ2 } = this.state;
-
-                // Cap dimensions to prevent browser lockup
-                if (sizeX > 64) { updates.sizeX = 64; sizeX = 64; }
-                if (sizeY > 64) { updates.sizeY = 64; sizeY = 64; }
-                if (sizeZ > 16) { updates.sizeZ = 16; sizeZ = 16; }
-
-                // Also prevent total cells from being too large
-                const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
-                if (totalCells > 4096) {
-                    // Reset to safer defaults if total is too large
-                    updates.sizeX = 32; sizeX = 32;
-                    updates.sizeY = 32; sizeY = 32;
-                    updates.sizeZ = 1; sizeZ = 1;
-                }
-
-                // Clamp chunk sizes to valid ranges
-                if (chunkX > sizeX) { updates.chunkX = sizeX; chunkX = sizeX; }
-                if (chunkY > sizeY) { updates.chunkY = sizeY; chunkY = sizeY; }
-                if (chunkZ > sizeZ) { updates.chunkZ = Math.max(1, sizeZ); chunkZ = Math.max(1, sizeZ); }
-
-                // Clamp query values to valid ranges
-                const maxX = sizeX - 1;
-                const maxY = sizeY - 1;
-                const maxZ = sizeZ - 1;
-
-                if (queryX1 > maxX) { updates.queryX1 = Math.max(0, maxX); }
-                if (queryX2 > maxX) { updates.queryX2 = Math.max(0, maxX); }
-                if (queryY1 > maxY) { updates.queryY1 = Math.max(0, maxY); }
-                if (queryY2 > maxY) { updates.queryY2 = Math.max(0, maxY); }
-                if (queryZ1 > maxZ) { updates.queryZ1 = Math.max(0, maxZ); }
-                if (queryZ2 > maxZ) { updates.queryZ2 = Math.max(0, maxZ); }
-
-                // Handle edge cases: if array dimension is 1, set sensible defaults
-                if (sizeX === 1) {
-                    updates.chunkX = 1;
-                    updates.queryX1 = 0;
-                    updates.queryX2 = 0;
-                }
-                if (sizeY === 1) {
-                    updates.chunkY = 1;
-                    updates.queryY1 = 0;
-                    updates.queryY2 = 0;
-                }
-                if (sizeZ === 1) {
-                    updates.chunkZ = 1;
-                    updates.queryZ1 = 0;
-                    updates.queryZ2 = 0;
-                }
-
-                // Update DOM constraints for HTML validation
-                const finalSizeX = updates.sizeX || sizeX;
-                const finalSizeY = updates.sizeY || sizeY;
-                const finalSizeZ = updates.sizeZ || sizeZ;
-
-                document.getElementById('chunkX').max = finalSizeX;
-                document.getElementById('chunkY').max = finalSizeY;
-                document.getElementById('chunkZ').max = Math.max(1, finalSizeZ);
-
-                document.getElementById('queryX1').max = Math.max(0, finalSizeX - 1);
-                document.getElementById('queryX2').max = Math.max(0, finalSizeX - 1);
-                document.getElementById('queryY1').max = Math.max(0, finalSizeY - 1);
-                document.getElementById('queryY2').max = Math.max(0, finalSizeY - 1);
-                document.getElementById('queryZ1').max = Math.max(0, finalSizeZ - 1);
-                document.getElementById('queryZ2').max = Math.max(0, finalSizeZ - 1);
-
-                // Apply any needed state updates
-                if (Object.keys(updates).length > 0) {
-                    this.setState(updates);
-                    this.renderUI(); // Only update form values, don't trigger full UI cycle
-                }
             }
 
             initializeCanvases() {
@@ -2475,7 +2143,7 @@
                 };
 
                 this.tooltipManager = new TooltipManager(document.getElementById('tooltip'));
-                this.interactionManager = new InteractionManager(this, this.canvases, this.tooltipManager);
+                this.interactionManager = new InteractionManager(this.visualizer, this.canvases, this.tooltipManager);
 
                 this.contexts = {};
                 this.renderers = {};
@@ -2486,16 +2154,16 @@
                     // Create specialized renderers
                     switch(key) {
                         case 'spatialUnchunked':
-                            this.renderers[key] = new SpatialUnchunkedRenderer(canvas, this.contexts[key], this);
+                            this.renderers[key] = new SpatialUnchunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
                             break;
                         case 'spatialChunked':
-                            this.renderers[key] = new SpatialChunkedRenderer(canvas, this.contexts[key], this);
+                            this.renderers[key] = new SpatialChunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
                             break;
                         case 'linearUnchunked':
-                            this.renderers[key] = new LinearUnchunkedRenderer(canvas, this.contexts[key], this);
+                            this.renderers[key] = new LinearUnchunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
                             break;
                         case 'linearChunked':
-                            this.renderers[key] = new LinearChunkedRenderer(canvas, this.contexts[key], this);
+                            this.renderers[key] = new LinearChunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
                             break;
                     }
 
@@ -2507,15 +2175,19 @@
                     }
                 }
 
+                this.setupResizeHandling();
+                this.setupGlobalClickHandler();
+
                 // Force initial resize after DOM is ready
                 setTimeout(() => {
                     this.resizeCanvases();
-                    this.update();
+                    this.visualizer.update();
                 }, 0);
 
                 this.resizeCanvases();
+            }
 
-                // Simple, efficient resize handling
+            setupResizeHandling() {
                 let resizeRAF = null;
 
                 const handleResize = () => {
@@ -2524,7 +2196,7 @@
                     resizeRAF = requestAnimationFrame(() => {
                         const needsUpdate = this.resizeCanvases();
                         if (needsUpdate) {
-                            this.update();
+                            this.visualizer.update();
                         }
                         resizeRAF = null;
                     });
@@ -2532,7 +2204,9 @@
 
                 // Only use window resize - simpler and more reliable
                 window.addEventListener('resize', handleResize);
+            }
 
+            setupGlobalClickHandler() {
                 // Clear selection when clicking outside visualizations
                 document.addEventListener('click', (e) => {
                     // Check if click was inside any canvas
@@ -2547,10 +2221,10 @@
                     }
 
                     // If clicked outside all canvases, clear selection
-                    if (!clickedCanvas && this.selectionState.hasSelection()) {
-                        this.selectionState.clearSelection();
+                    if (!clickedCanvas && this.visualizer.selectionState.hasSelection()) {
+                        this.visualizer.selectionState.clearSelection();
                         this.tooltipManager.hide();
-                        this.update();
+                        this.visualizer.update();
                     }
                 });
             }
@@ -2622,24 +2296,434 @@
                 return needsUpdate;
             }
 
+            renderAll(params, data) {
+                // Draw all views using specialized renderers
+                this.renderers.spatialUnchunked.render(params, data);
+                this.renderers.spatialChunked.render(params, data);
+                this.renderers.linearUnchunked.render(params, data);
+                this.renderers.linearChunked.render(params, data);
+            }
+        }
+
+        class SettingsManager {
+            constructor() {
+                this.loadSettings();
+            }
+
+            loadSettings() {
+                try {
+                    const saved = localStorage.getItem('vischunk-app-state');
+                    if (saved) {
+                        this.appState = JSON.parse(saved);
+                    } else {
+                        this.appState = DEFAULT_APP_STATE;
+                    }
+                } catch (error) {
+                    console.warn('Failed to load settings from localStorage:', error);
+                    this.appState = DEFAULT_APP_STATE;
+                }
+
+                // Initialize current visualization state from the selected preset
+                const currentPreset = this.appState.currentPreset;
+                const presetSettings = this.appState.presets[currentPreset] ||
+                                     this.getCanonicalPreset(currentPreset);
+
+                this.state = {
+                    ...presetSettings,
+                    currentPreset: currentPreset
+                };
+            }
+
+            saveSettings() {
+                // Save current preset settings (excluding currentPreset from the preset data)
+                const currentSettings = { ...this.state };
+                delete currentSettings.currentPreset;
+
+                // Only save preset if it differs from canonical version
+                const canonicalSettings = this.getCanonicalPreset(this.state.currentPreset);
+                const hasChanges = canonicalSettings && Object.keys(canonicalSettings).some(key =>
+                    currentSettings[key] !== canonicalSettings[key]
+                );
+
+                if (hasChanges) {
+                    // Preset is modified - save it
+                    this.appState.presets[this.state.currentPreset] = currentSettings;
+                } else {
+                    // Preset matches canonical - remove any saved version
+                    delete this.appState.presets[this.state.currentPreset];
+                }
+
+                // Always save the current preset selection
+                this.appState.currentPreset = this.state.currentPreset;
+
+                // Save entire app state
+                localStorage.setItem('vischunk-app-state', JSON.stringify(this.appState));
+            }
+
+            setState(newState) {
+                const oldState = { ...this.state };
+                this.state = { ...this.state, ...newState };
+                return { oldState, hasStructuralChanges: this.checkStructuralChanges(oldState, newState) };
+            }
+
+            checkStructuralChanges(oldState, newState) {
+                const structuralChanges = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ'];
+                return structuralChanges.some(key =>
+                    key in newState && oldState[key] !== newState[key]
+                );
+            }
+
+            validateAndClampState() {
+                let updates = {};
+                let { sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, queryX1, queryX2, queryY1, queryY2, queryZ1, queryZ2 } = this.state;
+
+                // Cap dimensions to prevent browser lockup
+                if (sizeX > 64) { updates.sizeX = 64; sizeX = 64; }
+                if (sizeY > 64) { updates.sizeY = 64; sizeY = 64; }
+                if (sizeZ > 16) { updates.sizeZ = 16; sizeZ = 16; }
+
+                // Also prevent total cells from being too large
+                const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
+                if (totalCells > 4096) {
+                    updates.sizeX = 32; sizeX = 32;
+                    updates.sizeY = 32; sizeY = 32;
+                    updates.sizeZ = 1; sizeZ = 1;
+                }
+
+                // Clamp chunk sizes to valid ranges
+                if (chunkX > sizeX) { updates.chunkX = sizeX; chunkX = sizeX; }
+                if (chunkY > sizeY) { updates.chunkY = sizeY; chunkY = sizeY; }
+                if (chunkZ > sizeZ) { updates.chunkZ = Math.max(1, sizeZ); chunkZ = Math.max(1, sizeZ); }
+
+                // Clamp query values to valid ranges
+                const maxX = sizeX - 1;
+                const maxY = sizeY - 1;
+                const maxZ = sizeZ - 1;
+
+                if (queryX1 > maxX) { updates.queryX1 = Math.max(0, maxX); }
+                if (queryX2 > maxX) { updates.queryX2 = Math.max(0, maxX); }
+                if (queryY1 > maxY) { updates.queryY1 = Math.max(0, maxY); }
+                if (queryY2 > maxY) { updates.queryY2 = Math.max(0, maxY); }
+                if (queryZ1 > maxZ) { updates.queryZ1 = Math.max(0, maxZ); }
+                if (queryZ2 > maxZ) { updates.queryZ2 = Math.max(0, maxZ); }
+
+                // Handle edge cases: if array dimension is 1, set sensible defaults
+                if (sizeX === 1) {
+                    updates.chunkX = 1;
+                    updates.queryX1 = 0;
+                    updates.queryX2 = 0;
+                }
+                if (sizeY === 1) {
+                    updates.chunkY = 1;
+                    updates.queryY1 = 0;
+                    updates.queryY2 = 0;
+                }
+                if (sizeZ === 1) {
+                    updates.chunkZ = 1;
+                    updates.queryZ1 = 0;
+                    updates.queryZ2 = 0;
+                }
+
+                return updates;
+            }
+
+            updateDOMConstraints() {
+                const { sizeX, sizeY, sizeZ } = this.state;
+
+                document.getElementById('chunkX').max = sizeX;
+                document.getElementById('chunkY').max = sizeY;
+                document.getElementById('chunkZ').max = Math.max(1, sizeZ);
+
+                document.getElementById('queryX1').max = Math.max(0, sizeX - 1);
+                document.getElementById('queryX2').max = Math.max(0, sizeX - 1);
+                document.getElementById('queryY1').max = Math.max(0, sizeY - 1);
+                document.getElementById('queryY2').max = Math.max(0, sizeY - 1);
+                document.getElementById('queryZ1').max = Math.max(0, sizeZ - 1);
+                document.getElementById('queryZ2').max = Math.max(0, sizeZ - 1);
+            }
+
+            renderUI() {
+                Object.keys(this.state).forEach(key => {
+                    if (key === 'currentPreset') {
+                        const presetsEl = document.getElementById('presets');
+                        if (presetsEl) presetsEl.value = this.state[key];
+                    } else {
+                        const element = document.getElementById(key);
+                        if (element) element.value = this.state[key];
+                    }
+                });
+            }
+
+            getCanonicalPreset(presetName) {
+                if (presetName === 'user') {
+                    return DEFAULT_USER_SETTINGS;
+                } else if (PRESET_CONFIGS[presetName]) {
+                    const { name, ...settings } = PRESET_CONFIGS[presetName];
+                    return settings;
+                }
+                return null;
+            }
+
+            getCurrentPresetSettings(presetName) {
+                return this.appState.presets[presetName] || this.getCanonicalPreset(presetName);
+            }
+
+            getPresetDisplayName(presetName, includeModificationIndicator = false) {
+                let baseName = presetName === 'user' ? 'User Settings' :
+                              PRESET_CONFIGS[presetName]?.name || presetName;
+
+                if (includeModificationIndicator && this.isPresetModified(presetName)) {
+                    baseName += ' *';
+                }
+
+                return baseName;
+            }
+
+            isPresetModified(presetName) {
+                if (presetName === 'user') {
+                    return false;
+                } else if (PRESET_CONFIGS[presetName]) {
+                    return !!(this.appState && this.appState.presets && this.appState.presets[presetName]);
+                }
+                return false;
+            }
+
+            loadPreset(presetName) {
+                this.appState.currentPreset = presetName;
+                const presetSettings = this.getCurrentPresetSettings(presetName);
+                if (presetSettings) {
+                    this.setState({ ...presetSettings, currentPreset: presetName });
+                    return true;
+                }
+                return false;
+            }
+
+            resetCurrentPreset() {
+                const presetName = this.state.currentPreset;
+
+                // Remove user modifications for this preset
+                if (this.appState.presets[presetName]) {
+                    delete this.appState.presets[presetName];
+                }
+
+                // Load canonical preset
+                const canonicalSettings = this.getCanonicalPreset(presetName);
+                if (canonicalSettings) {
+                    this.setState({ ...canonicalSettings, currentPreset: presetName });
+                    return true;
+                }
+                return false;
+            }
+
+            shouldShowResetButton() {
+                const canonical = this.getCanonicalPreset(this.state.currentPreset);
+                return canonical && Object.keys(canonical).some(key =>
+                    this.state[key] !== canonical[key]
+                );
+            }
+        }
+
+        class DataVisualizer {
+            constructor() {
+                // Initialize coordinate service and settings manager
+                this.coordinateService = new CoordinateService();
+                this.settingsManager = new SettingsManager();
+                
+                this.selectionState = new SelectionState();
+
+                // Initialize caches with LRU policy
+                this.linearizationCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+                this.positionCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+                this.chunkPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
+                this.cellPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
+                this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+
+                // Initialize linearization engine
+                this.linearizationEngine = new LinearizationEngine(
+                    this.linearizationCache,
+                    this.positionCache,
+                    this.chunkPositionCache,
+                    this.cellPositionCache
+                );
+
+                // Initialize canvas manager
+                this.canvasManager = new CanvasManager(this);
+
+                this.initializeControls();
+                this.canvasManager.initializeCanvases();
+                this.updateUI();
+                this.update();
+            }
+
+
+            getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY) {
+                for (let cy = 0; cy < sizeY; cy++) {
+                    for (let cx = 0; cx < sizeX; cx++) {
+                        const globalPos = this.getGlobalPosition(cx, cy, 0, params);
+                        if (globalPos === cellIndex) {
+                            return { 
+                                x: cx, 
+                                y: cy,
+                                chunkX: Math.floor(cx / chunkX),
+                                chunkY: Math.floor(cy / chunkY)
+                            };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            setState(newState) {
+                const { oldState, hasStructuralChanges } = this.settingsManager.setState(newState);
+
+                // Caches are now managed by LRU policy.
+                // Clearing them on every structural change would prevent the performance benefit
+                // of switching back and forth between recent settings.
+                // if (hasStructuralChanges) {
+                //     this.clearCaches();
+                // }
+            }
+
+            // Full UI update cycle - call this after setState() when you want to update the display
+            updateUI() {
+                this.settingsManager.renderUI();
+                this.settingsManager.updateDOMConstraints();
+                this.updateResetButton();
+                this.updatePresetDisplay();
+                this.update();
+            }
+
+            // Clear all caches when structural changes occur
+            clearCaches() {
+                this.linearizationCache.clear();
+                this.positionCache.clear();
+                if (this.chunkPositionCache) this.chunkPositionCache.clear();
+                if (this.cellPositionCache) this.cellPositionCache.clear();
+                if (this.colorCache) this.colorCache.clear();
+                if (this.coordinateService) this.coordinateService.clearCache();
+            }
+
+            populatePresetOptions() {
+                const presetsSelect = document.getElementById('presets');
+
+                // Add preset options dynamically
+                Object.keys(PRESET_CONFIGS).forEach(presetKey => {
+                    const option = document.createElement('option');
+                    option.value = presetKey;
+                    option.textContent = this.settingsManager.getPresetDisplayName(presetKey, true);
+                    presetsSelect.appendChild(option);
+                });
+            }
+
+            initializeControls() {
+                // Populate preset options
+                this.populatePresetOptions();
+
+                const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ',
+                                 'chunkX', 'chunkY', 'chunkZ',
+                                 'queryX1', 'queryX2', 'queryY1', 'queryY2',
+                                 'queryZ1', 'queryZ2'];
+
+                controls.forEach(id => {
+                    const element = document.getElementById(id);
+                    element.addEventListener('change', (e) => {
+                        let value = e.target.type === 'number' ?
+                            parseInt(e.target.value) :
+                            e.target.value;
+
+                        // Validate numeric inputs
+                        if (e.target.type === 'number') {
+                            if (isNaN(value)) {
+                                console.warn(`Invalid input value: ${e.target.value}, resetting to 1`);
+                                value = 1;
+                            } else {
+                                // Apply proper constraints based on field type
+                                if (id.startsWith('size') || id.startsWith('chunk')) {
+                                    value = Math.max(1, value); // Dimensions and chunk sizes must be >= 1
+                                } else {
+                                    value = Math.max(0, value); // Query ranges can start at 0
+                                }
+
+                                // Apply upper limits
+                                if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
+                                if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
+                            }
+                        }
+
+                        this.setState({ [id]: value });
+                        this.updateUI();
+                        this.settingsManager.saveSettings(); // Explicit save for user input
+                    });
+                });
+
+                // Add preset handler
+                document.getElementById('presets').addEventListener('change', (e) => {
+                    this.settingsManager.loadPreset(e.target.value);
+                    this.updateUI();
+                    this.settingsManager.saveSettings(); // Save when user explicitly changes preset
+                });
+
+                // Add reset button handler
+                document.getElementById('resetButton').addEventListener('click', () => {
+                    this.settingsManager.resetCurrentPreset();
+                    this.updateUI();
+                    this.settingsManager.saveSettings();
+                });
+
+                this.updateConstraints();
+                this.updateResetButton();
+            }
+
+            updateResetButton() {
+                const resetButton = document.getElementById('resetButton');
+                const shouldShow = this.settingsManager.shouldShowResetButton();
+                
+                resetButton.disabled = !shouldShow;
+                resetButton.style.opacity = shouldShow ? '1' : '0.5';
+            }
+
+            updatePresetDisplay() {
+                const presetsSelect = document.getElementById('presets');
+
+                // Update all preset option text to show/hide asterisks
+                presetsSelect.querySelectorAll('option').forEach(option => {
+                    option.textContent = this.settingsManager.getPresetDisplayName(option.value, true);
+                });
+            }
+
+            updateConstraints() {
+                // Validate and clamp state values using settings manager
+                const updates = this.settingsManager.validateAndClampState();
+                
+                // Update DOM constraints
+                this.settingsManager.updateDOMConstraints();
+
+                // Apply any needed state updates
+                if (Object.keys(updates).length > 0) {
+                    this.setState(updates);
+                    this.settingsManager.renderUI(); // Only update form values, don't trigger full UI cycle
+                }
+            }
+
             getParameters() {
+                const state = this.settingsManager.state;
                 return {
-                    cellAlgorithm: this.state.cellAlgorithm,
-                    chunkAlgorithm: this.state.chunkAlgorithm,
+                    cellAlgorithm: state.cellAlgorithm,
+                    chunkAlgorithm: state.chunkAlgorithm,
                     size: [
-                        this.state.sizeX,
-                        this.state.sizeY,
-                        this.state.sizeZ
+                        state.sizeX,
+                        state.sizeY,
+                        state.sizeZ
                     ],
                     chunk: [
-                        this.state.chunkX,
-                        this.state.chunkY,
-                        this.state.chunkZ
+                        state.chunkX,
+                        state.chunkY,
+                        state.chunkZ
                     ],
                     query: {
-                        x: [this.state.queryX1, this.state.queryX2],
-                        y: [this.state.queryY1, this.state.queryY2],
-                        z: [this.state.queryZ1, this.state.queryZ2]
+                        x: [state.queryX1, state.queryX2],
+                        y: [state.queryY1, state.queryY2],
+                        z: [state.queryZ1, state.queryZ2]
                     }
                 };
             }
@@ -2739,23 +2823,39 @@
                 const data = this.calculateData(params);
                 this.currentData = data; // Store for mouse interactions
 
-                // Draw all views using specialized renderers
-                this.renderers.spatialUnchunked.render(params, data);
-                this.renderers.spatialChunked.render(params, data);
-                this.renderers.linearUnchunked.render(params, data);
-                this.renderers.linearChunked.render(params, data);
+                // Draw all views using canvas manager
+                this.canvasManager.renderAll(params, data);
 
                 // Update metrics
                 this.updateMetrics(data);
-
-                // Align grid headers after everything is rendered
             }
 
             calculateData(params) {
                 const [sizeX, sizeY, sizeZ] = params.size;
                 const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
 
-                // Calculate requested cells
+                const { requestedCells, touchedChunks } = this.calculateRequestedCellsAndChunks(params, sizeX, sizeY, sizeZ);
+                const actualCells = this.calculateActualCellsFromChunks(touchedChunks, params, sizeX, sizeY, sizeZ);
+
+                const chunkedRanges = this.calculateByteRanges(
+                    this.cellSetToPositions(actualCells, params)
+                );
+
+                const unchunkedRanges = this.calculateByteRanges(
+                    this.cellSetToPositions(requestedCells, params)
+                );
+
+                return {
+                    requestedCells,
+                    actualCells,
+                    touchedChunks,
+                    chunkedRanges,
+                    unchunkedRanges,
+                    totalCells
+                };
+            }
+
+            calculateRequestedCellsAndChunks(params, sizeX, sizeY, sizeZ) {
                 const requestedCells = new Set();
                 const touchedChunks = new Set();
 
@@ -2773,56 +2873,54 @@
                     }
                 }
 
-                // Calculate actual cells read (all cells in touched chunks)
+                return { requestedCells, touchedChunks };
+            }
+
+            calculateActualCellsFromChunks(touchedChunks, params, sizeX, sizeY, sizeZ) {
                 const actualCells = new Set();
                 const [chunkX, chunkY, chunkZ] = params.chunk;
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
 
                 touchedChunks.forEach(chunkIdx => {
-                    const cz = Math.floor(chunkIdx / (chunksX * chunksY));
-                    const cy = Math.floor((chunkIdx % (chunksX * chunksY)) / chunksX);
-                    const cx = chunkIdx % chunksX;
+                    const chunkCoords = this.getChunkCoordsFromIndex(chunkIdx, chunksX, chunksY);
+                    this.addChunkCells(actualCells, chunkCoords, params, sizeX, sizeY, sizeZ);
+                });
 
-                    for (let dx = 0; dx < chunkX; dx++) {
-                        for (let dy = 0; dy < chunkY; dy++) {
-                            for (let dz = 0; dz < (sizeZ > 0 ? chunkZ : 1); dz++) {
-                                const x = cx * chunkX + dx;
-                                const y = cy * chunkY + dy;
-                                const z = cz * chunkZ + dz;
+                return actualCells;
+            }
 
-                                if (x < sizeX && y < sizeY && (sizeZ === 0 || z < sizeZ)) {
-                                    actualCells.add(`${x},${y},${z}`);
-                                }
+            getChunkCoordsFromIndex(chunkIdx, chunksX, chunksY) {
+                const cz = Math.floor(chunkIdx / (chunksX * chunksY));
+                const cy = Math.floor((chunkIdx % (chunksX * chunksY)) / chunksX);
+                const cx = chunkIdx % chunksX;
+                return { cx, cy, cz };
+            }
+
+            addChunkCells(actualCells, chunkCoords, params, sizeX, sizeY, sizeZ) {
+                const [chunkX, chunkY, chunkZ] = params.chunk;
+                const { cx, cy, cz } = chunkCoords;
+
+                for (let dx = 0; dx < chunkX; dx++) {
+                    for (let dy = 0; dy < chunkY; dy++) {
+                        for (let dz = 0; dz < (sizeZ > 0 ? chunkZ : 1); dz++) {
+                            const x = cx * chunkX + dx;
+                            const y = cy * chunkY + dy;
+                            const z = cz * chunkZ + dz;
+
+                            if (x < sizeX && y < sizeY && (sizeZ === 0 || z < sizeZ)) {
+                                actualCells.add(`${x},${y},${z}`);
                             }
                         }
                     }
+                }
+            }
+
+            cellSetToPositions(cellSet, params) {
+                return [...cellSet].map(key => {
+                    const [x, y, z] = key.split(',').map(Number);
+                    return this.getGlobalPosition(x, y, z, params);
                 });
-
-                // Calculate byte ranges for chunked reads
-                const chunkedRanges = this.calculateByteRanges(
-                    [...actualCells].map(key => {
-                        const [x, y, z] = key.split(',').map(Number);
-                        return this.getGlobalPosition(x, y, z, params);
-                    })
-                );
-
-                // Calculate byte ranges for unchunked reads
-                const unchunkedRanges = this.calculateByteRanges(
-                    [...requestedCells].map(key => {
-                        const [x, y, z] = key.split(',').map(Number);
-                        return this.getGlobalPosition(x, y, z, params);
-                    })
-                );
-
-                return {
-                    requestedCells,
-                    actualCells,
-                    touchedChunks,
-                    chunkedRanges,
-                    unchunkedRanges,
-                    totalCells
-                };
             }
 
             calculateByteRanges(positions) {
