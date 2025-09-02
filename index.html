@@ -304,7 +304,7 @@
         }
 
         .tooltip {
-            position: absolute;
+            position: fixed;
             background: rgba(0, 0, 0, 0.9);
             color: #fff;
             padding: 8px 12px;
@@ -1770,8 +1770,11 @@
                         const intraChunkPos = this.getIntraChunkPosition(cellX, cellY, 0, params);
                         const globalPos = this.getGlobalPosition(cellX, cellY, 0, params);
                         this.tooltip.style.display = 'block';
+                        this.tooltip.style.position = 'fixed';
                         this.tooltip.style.left = `${e.clientX + 10}px`;
                         this.tooltip.style.top = `${e.clientY - 30}px`;
+                        this.tooltip.style.transform = 'none';
+                        this.tooltip.style.margin = '0';
                         this.tooltip.textContent = `Cell (${cellX}, ${cellY}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`;
                     } else {
                         this.hoveredCell = null;
@@ -1805,8 +1808,11 @@
                         const interChunkPos = this.getInterChunkPosition(startX, startY, 0, params);
 
                         this.tooltip.style.display = 'block';
+                        this.tooltip.style.position = 'fixed';
                         this.tooltip.style.left = `${e.clientX + 10}px`;
                         this.tooltip.style.top = `${e.clientY - 30}px`;
+                        this.tooltip.style.transform = 'none';
+                        this.tooltip.style.margin = '0';
                         this.tooltip.textContent = `Chunk ${chunkIdx}: cells (${startX},${startY}) to (${endX},${endY}), Linear pos: ${interChunkPos}`;
                     } else {
                         this.hoveredChunk = null;
