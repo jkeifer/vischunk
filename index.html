@@ -5,6 +5,110 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multidimensional Data Linearization</title>
     <style>
+        /* ========================================
+           CSS CUSTOM PROPERTIES
+           ======================================== */
+        :root {
+            /* Colors - Primary Palette */
+            --color-primary: #4a9eff;
+            --color-primary-hover: #7cb3ff;
+            --color-secondary: #667eea;
+            --color-tertiary: #764ba2;
+            --color-warning: #ffc107;
+            --color-success: #00ff00;
+            --color-danger: #ff0000;
+            
+            /* Colors - Backgrounds */
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #2a2a3e;
+            --bg-panel: rgba(255, 255, 255, 0.03);
+            --bg-panel-hover: rgba(255, 255, 255, 0.05);
+            --bg-input: rgba(255, 255, 255, 0.1);
+            --bg-input-focus: rgba(255, 255, 255, 0.15);
+            --bg-dark: rgba(0, 0, 0, 0.3);
+            --bg-tooltip: rgba(0, 0, 0, 0.9);
+            --bg-highlight: rgba(255, 255, 255, 0.4);
+            --bg-warning: rgba(255, 200, 0, 0.1);
+            
+            /* Colors - Text */
+            --text-primary: #fff;
+            --text-secondary: #eee;
+            --text-muted: #aaa;
+            --text-light: #bbb;
+            --text-dark: #333;
+            --text-very-light: #ccc;
+            --text-extra-light: #ddd;
+            
+            /* Colors - Borders */
+            --border-primary: rgba(255, 255, 255, 0.1);
+            --border-secondary: rgba(255, 255, 255, 0.2);
+            --border-input: rgba(255, 255, 255, 0.2);
+            --border-input-focus: #4a9eff;
+            --border-warning: rgba(255, 200, 0, 0.3);
+            --border-light: rgba(255, 255, 255, 0.3);
+            
+            /* Spacing Scale */
+            --space-xs: 3px;
+            --space-sm: 5px;
+            --space-md: 8px;
+            --space-lg: 10px;
+            --space-xl: 15px;
+            --space-2xl: 20px;
+            --space-3xl: 25px;
+            --space-4xl: 30px;
+            --space-5xl: 40px;
+            
+            /* Border Radius */
+            --radius-sm: 3px;
+            --radius-md: 5px;
+            --radius-lg: 8px;
+            --radius-xl: 10px;
+            --radius-2xl: 15px;
+            
+            /* Typography */
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segue UI', Roboto, sans-serif;
+            --font-size-xs: 0.85em;
+            --font-size-sm: 0.9em;
+            --font-size-base: 1em;
+            --font-size-lg: 1.1em;
+            --font-size-xl: 1.3em;
+            --font-size-2xl: 1.8em;
+            --font-size-3xl: 2em;
+            --font-size-4xl: 2.5em;
+            --font-weight-normal: 400;
+            --font-weight-medium: 500;
+            --font-weight-semibold: 600;
+            --font-weight-bold: 700;
+            
+            /* Effects */
+            --blur-sm: blur(5px);
+            --blur-md: blur(10px);
+            --transition-fast: 0.3s;
+            
+            /* Layout */
+            --max-width-content: 1600px;
+            --max-width-text: 850px;
+            --min-width-content: 320px;
+            
+            /* Z-index Scale */
+            --z-tooltip: 1000;
+            --z-modal: 900;
+            --z-overlay: 800;
+            
+            /* Canvas */
+            --canvas-max-size: 400px;
+            --canvas-min-cell-size: 2px;
+            --canvas-viewport-cell-size: 8px;
+            
+            /* Gradients */
+            --gradient-primary: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            --gradient-metrics: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-color-scale: linear-gradient(90deg, #00ff00, #ff0000);
+        }
+
+        /* ========================================
+           BASE STYLES & RESET
+           ======================================== */
         * {
             margin: 0;
             padding: 0;
@@ -12,12 +116,24 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segue UI', Roboto, sans-serif;
-            background: #1a1a2e;
+            font-family: var(--font-family);
+            background: var(--bg-primary);
             min-height: 100vh;
-            min-width: 320px;
-            padding: 15px;
-            color: #eee;
+            min-width: var(--min-width-content);
+            padding: var(--space-xl);
+            color: var(--text-secondary);
+        }
+
+        a {
+            color: var(--color-primary);
+            text-decoration: none;
+            font-weight: var(--font-weight-medium);
+            transition: color var(--transition-fast);
+        }
+
+        a:hover {
+            color: var(--color-primary-hover);
+            text-decoration: underline;
         }
 
         .container {
@@ -25,83 +141,123 @@
         }
 
         .content-wrapper {
-            max-width: 1600px;
-            min-width: 320px;
+            max-width: var(--max-width-content);
+            min-width: var(--min-width-content);
             margin: 0 auto;
         }
 
+        /* Typography - Base styles */
         h1 {
-            color: #fff;
-            margin-bottom: 10px;
-            font-size: 2em;
+            color: var(--text-primary);
+            margin-bottom: var(--space-lg);
+            font-size: var(--font-size-4xl);
             text-align: center;
         }
 
+        h2 {
+            color: var(--text-primary);
+            margin-bottom: var(--space-lg);
+            font-size: var(--font-size-3xl);
+            text-align: center;
+        }
+
+        /* ========================================
+           UTILITY CLASSES
+           ======================================== */
+        .panel {
+            background: var(--bg-panel-hover);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
+            backdrop-filter: var(--blur-md);
+        }
+        
+        .panel-primary {
+            background: var(--gradient-primary);
+            border-radius: var(--radius-2xl);
+            padding: var(--space-xl);
+            backdrop-filter: var(--blur-md);
+            border: 1px solid var(--border-primary);
+        }
+        
+        .blur-effect {
+            backdrop-filter: var(--blur-md);
+        }
+        
+        .blur-effect-sm {
+            backdrop-filter: var(--blur-sm);
+        }
+
+        /* ========================================
+           LAYOUT COMPONENTS
+           ======================================== */
         .subtitle {
-            color: #aaa;
-            margin-bottom: 15px;
+            color: var(--text-muted);
+            margin-bottom: var(--space-xl);
             text-align: center;
         }
 
         .section-container {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--bg-panel);
+            border-radius: var(--radius-2xl);
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+            border: 1px solid var(--border-primary);
         }
 
 
         .section-container h2 {
-            color: #fff;
-            font-size: 1.3em;
-            margin: 0 0 15px 0;
+            color: var(--text-primary);
+            font-size: var(--font-size-xl);
+            margin: 0 0 var(--space-xl) 0;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
         .simulation-wrapper {
-            padding: 15px 15px 15px;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: var(--space-xl);
+            background: var(--gradient-primary);
+            border-radius: var(--radius-2xl);
+            backdrop-filter: var(--blur-md);
+            border: 1px solid var(--border-primary);
         }
 
         .simulation-wrapper > h2 {
-            color: #fff;
-            font-size: 1.8em;
-            margin-bottom: 15px;
+            color: var(--text-primary);
+            font-size: var(--font-size-2xl);
+            margin-bottom: var(--space-xl);
             text-align: center;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
+        /* ========================================
+           FORM CONTROLS & INPUTS
+           ======================================== */
         .controls {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            grid-template-rows: auto 1fr; /* Header row + content row */
-            gap: 15px;
-            margin-bottom: 15px;
+            grid-template-rows: auto 1fr;
+            gap: var(--space-xl);
+            margin-bottom: var(--space-xl);
         }
 
         .control-section {
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
+            padding: var(--space-xl);
+            background: var(--bg-panel-hover);
+            border-radius: var(--radius-xl);
+            backdrop-filter: var(--blur-md);
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: var(--space-xl);
         }
 
         /* Removed problematic subgrid rules that were causing dropdown stacking */
 
         .section-title {
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 5px;
-            font-size: 0.9em;
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            margin-bottom: var(--space-sm);
+            font-size: var(--font-size-sm);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -112,93 +268,92 @@
         }
 
         label {
-            font-weight: 500;
-            color: #bbb;
-            margin-bottom: 5px;
-            font-size: 0.85em;
+            font-weight: var(--font-weight-medium);
+            color: var(--text-light);
+            margin-bottom: var(--space-sm);
+            font-size: var(--font-size-xs);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         input[type="number"], select {
-            padding: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 5px;
+            padding: var(--space-md);
+            border: 1px solid var(--border-input);
+            border-radius: var(--radius-md);
             font-size: 14px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            transition: all 0.3s;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            transition: all var(--transition-fast);
         }
 
         input[type="number"]:focus, select:focus {
             outline: none;
-            border-color: #4a9eff;
-            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--border-input-focus);
+            background: var(--bg-input-focus);
         }
 
         select option {
-            background: #2a2a3e;
-            color: #fff;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
         }
 
         .query-controls {
-            background: rgba(255, 200, 0, 0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            border: 1px solid rgba(255, 200, 0, 0.3);
+            background: var(--bg-warning);
+            padding: var(--space-xl);
+            border-radius: var(--radius-xl);
+            margin-bottom: var(--space-xl);
+            border: 1px solid var(--border-warning);
         }
 
         .query-title {
-            font-weight: 600;
-            color: #ffc107;
-            margin-bottom: 10px;
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-warning);
+            margin-bottom: var(--space-lg);
             text-transform: uppercase;
-            font-size: 0.9em;
+            font-size: var(--font-size-sm);
         }
 
         .range-inputs {
             display: flex;
-            gap: 15px;
+            gap: var(--space-xl);
             flex-wrap: wrap;
         }
 
         .range-group {
             display: flex;
-            gap: 15px;
+            gap: var(--space-xl);
             align-items: center;
-            color: #ddd;
+            color: var(--text-extra-light);
         }
 
         .range-group input {
             width: 60px;
         }
 
+        /* ========================================
+           VISUALIZATION COMPONENTS
+           ======================================== */
         .spatial-views {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 15px;
+            gap: var(--space-xl);
+            margin-bottom: var(--space-xl);
         }
 
-        @media (max-width: 768px) {
-            .spatial-views {
-                grid-template-columns: 1fr;
-            }
-        }
+        /* Moved to consolidated media queries section at end */
 
         .viz-panel {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
+            background: var(--bg-panel-hover);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
+            backdrop-filter: var(--blur-md);
         }
 
         .viz-title {
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 15px;
-            font-size: 1.1em;
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+            margin-bottom: var(--space-xl);
+            font-size: var(--font-size-lg);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -206,9 +361,9 @@
         .canvas-container {
             position: relative;
             width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 5px;
-            padding: 10px;
+            background: var(--bg-dark);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
         }
 
         canvas {
@@ -221,60 +376,41 @@
         }
 
         .linear-views {
-            margin-bottom: 15px;
+            margin-bottom: var(--space-xl);
         }
 
         .linear-viz {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
-            backdrop-filter: blur(10px);
+            background: var(--bg-panel-hover);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+            backdrop-filter: var(--blur-md);
         }
 
+        /* ========================================
+           METRICS & DATA DISPLAY
+           ======================================== */
         .metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            grid-template-rows: auto auto; /* Label row + value row, both natural size */
-            gap: 5px 15px; /* row-gap column-gap - tight gap between label/value, normal gap between metrics */
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 10px;
+            grid-template-rows: auto auto;
+            gap: var(--space-sm) var(--space-xl);
+            padding: var(--space-xl);
+            background: var(--gradient-metrics);
+            border-radius: var(--radius-xl);
         }
 
-        @media (min-width: 1200px) {
-            .metrics {
-                grid-template-columns: repeat(8, 1fr);
-            }
-        }
-
-        @media (max-width: 1199px) and (min-width: 800px) {
-            .metrics {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
-
-        @media (max-width: 799px) and (min-width: 400px) {
-            .metrics {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 399px) {
-            .metrics {
-                grid-template-columns: 1fr;
-            }
-        }
+        /* Moved to consolidated media queries section at end */
 
         .metric {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 8px;
+            background: var(--bg-input);
+            padding: var(--space-xl);
+            border-radius: var(--radius-lg);
             text-align: center;
-            backdrop-filter: blur(10px);
+            backdrop-filter: var(--blur-md);
             display: grid;
-            grid-template-rows: subgrid; /* Align with parent grid rows */
-            grid-row: span 2; /* Span both label and value rows */
+            grid-template-rows: subgrid;
+            grid-row: span 2;
         }
 
         /* Fallback for browsers without subgrid support */
@@ -284,51 +420,67 @@
                 grid-row: auto;
             }
         }
+        
+        /* Performance optimization: disable blur for low-end devices */
+        @media (prefers-reduced-motion: reduce) {
+            .blur-effect,
+            .blur-effect-sm {
+                backdrop-filter: none;
+            }
+        }
 
         .metric-label {
-            font-size: 0.85em;
-            color: rgba(255, 255, 255, 0.8);
-            margin-bottom: 5px;
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+            margin-bottom: var(--space-sm);
             text-transform: uppercase;
+            opacity: 0.8;
         }
 
         .metric-value {
             font-size: 2em;
-            font-weight: bold;
-            color: #fff;
+            font-weight: var(--font-weight-bold);
+            color: var(--text-primary);
         }
 
         .metric-suffix {
             font-size: 0.5em;
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--text-secondary);
+            opacity: 0.7;
         }
 
+        /* ========================================
+           INTERACTIVE ELEMENTS
+           ======================================== */
         .tooltip {
             position: fixed;
-            background: rgba(0, 0, 0, 0.9);
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 5px;
+            background: var(--bg-tooltip);
+            color: var(--text-primary);
+            padding: var(--space-md) var(--space-lg);
+            border-radius: var(--radius-md);
             font-size: 12px;
             pointer-events: none;
-            z-index: 1000;
+            z-index: var(--z-tooltip);
             display: none;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid var(--border-secondary);
         }
 
+        /* ========================================
+           DOCUMENTATION & HELP SECTIONS
+           ======================================== */
         .explanation {
-            margin: 40px auto 0 auto;
-            padding: 15px 15px 15px;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: var(--space-5xl) auto 0 auto;
+            padding: var(--space-xl);
+            background: var(--gradient-primary);
+            border-radius: var(--radius-2xl);
+            backdrop-filter: var(--blur-md);
+            border: 1px solid var(--border-primary);
         }
 
         .explanation h2 {
-            color: #fff;
-            font-size: 1.8em;
-            margin-bottom: 15px;
+            color: var(--text-primary);
+            font-size: var(--font-size-2xl);
+            margin-bottom: var(--space-xl);
             text-align: center;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -337,79 +489,68 @@
         .explanation-content {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
+            gap: var(--space-xl);
+            margin-top: var(--space-xl);
         }
 
-        @media (min-width: 1200px) {
-            .explanation-content {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
+        /* Moved to consolidated media queries section at end */
 
         .explanation-section {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--bg-panel-hover);
+            padding: var(--space-xl);
+            border-radius: var(--radius-xl);
+            backdrop-filter: var(--blur-sm);
+            border: 1px solid var(--border-primary);
         }
 
         .explanation-section h3 {
-            color: #4a9eff;
+            color: var(--color-primary);
             font-size: 1.2em;
-            margin-bottom: 15px;
-            font-weight: 600;
+            margin-bottom: var(--space-xl);
+            font-weight: var(--font-weight-semibold);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .explanation-section p {
-            color: #ccc;
+            color: var(--text-very-light);
             line-height: 1.6;
-            margin-bottom: 15px;
+            margin-bottom: var(--space-xl);
         }
 
         .explanation-section ul {
-            color: #ccc;
-            margin-left: 15px;
+            color: var(--text-very-light);
+            margin-left: var(--space-xl);
             line-height: 1.6;
         }
 
         .explanation-section li {
-            margin-bottom: 8px;
+            margin-bottom: var(--space-md);
         }
 
         .color-example {
             display: inline-block;
             width: 20px;
             height: 20px;
-            border-radius: 3px;
-            margin-right: 8px;
+            border-radius: var(--radius-sm);
+            margin-right: var(--space-md);
             vertical-align: middle;
-            border: 3px solid rgb(255, 255, 255);
+            border: 3px solid var(--text-primary);
         }
 
 
-        .highlight-white {
-            background: rgba(255, 255, 255, 0.4);
-        }
-
-        .gradient-example {
-            background: linear-gradient(90deg, #00ff00, #ff0000);
-            border: none;
-        }
+        /* Removed unused classes - highlight-white and gradient-example */
 
         /* Hide Z dimension controls for now */
         .z-control {
-            display: none !important;
-            /*display: flex !important;*/
+            display: none;
+            /* Enable when 3D support is added: display: flex; */
         }
 
         .legend {
             display: flex;
-            gap: 15px;
-            margin-top: 10px;
+            gap: var(--space-xl);
+            margin-top: var(--space-lg);
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -417,57 +558,102 @@
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            color: #aaa;
-            font-size: 0.9em;
+            gap: var(--space-md);
+            color: var(--text-muted);
+            font-size: var(--font-size-sm);
         }
 
         .legend-color {
             width: 20px;
             height: 20px;
-            border-radius: 3px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-light);
         }
 
         .reset-button {
             display: block;
             margin: 0 auto;
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 5px;
-            color: #fff;
+            padding: var(--space-md) var(--space-2xl);
+            background: var(--bg-input);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
             font-size: 12px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all var(--transition-fast);
             text-decoration: none;
             width: fit-content;
         }
 
         .reset-button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: #4a9eff;
+            background: var(--bg-input-focus);
+            border-color: var(--border-input-focus);
+            transform: translateY(-1px);
         }
 
         .github-link-container {
             text-align: center;
-            margin: 10px 0;
+            margin: 20px auto;
         }
 
         .github-link {
-            color: #4a9eff;
+            color: var(--color-primary);
             text-decoration: none;
             font-size: 14px;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: var(--space-sm);
+        }
+
+        .github-link:hover {
+            color: var(--color-primary-hover);
+        }
+
+        .overview-container {
+            margin: auto auto var(--space-4xl) auto;
+            padding: var(--space-lg);
+            max-width: var(--max-width-content);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-primary);
+        }
+
+        .overview-content {
+            margin: var(--space-2xl) auto;
+            padding: var(--space-2xl);
+            max-width: var(--max-width-text);
+            border-top: 1px solid var(--border-primary);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .overview-content h2 {
+            color: var(--text-primary);
+            font-size: 1.7em;
+            margin-bottom: var(--space-2xl);
+            text-align: center;
+        }
+
+        .overview-content p {
+            color: var(--text-extra-light);
+            line-height: 1.7;
+            margin-bottom: 18px;
+            font-size: 1.05em;
+        }
+
+        .overview-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .overview-content strong {
+            color: var(--text-primary);
+            font-weight: var(--font-weight-semibold);
+            font-style: italic;
         }
 
         .preset-controls {
             display: flex;
             align-items: flex-end;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: var(--space-xl);
+            margin-bottom: var(--space-2xl);
             flex-wrap: wrap;
         }
 
@@ -483,28 +669,118 @@
         }
 
         .gradient-legend {
-            background: linear-gradient(90deg, #00ff00, #ff0000);
+            background: var(--gradient-color-scale);
         }
 
         .query-legend {
-            border: 3px solid #4a9eff;
+            border: 3px solid var(--color-primary);
             background: transparent;
+        }
+
+        /* ========================================
+           MEDIA QUERIES
+           ======================================== */
+        @media (min-width: 1200px) {
+            .metrics {
+                grid-template-columns: repeat(8, 1fr);
+            }
+            
+            .explanation-content {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1199px) and (min-width: 800px) {
+            .metrics {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 799px) and (min-width: 400px) {
+            .metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .spatial-views {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 399px) {
+            .metrics {
+                grid-template-columns: 1fr;
+            }
         }
 
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Multidimensional Data Linearization Visualizer</h1>
-        <p class="subtitle">Explore how chunking and linearization strategies affect read patterns</p>
+    <div class="content-wrapper container">
+        <div class="overview-container">
+            <h1>vischunk</h1>
+            <h2>An nd-Array Chunking and Linearization Analyzer</h2>
+            <p class="subtitle">
+                Explore how chunking and linearization strategies affect the
+                efficiency of various read patterns
+            </p>
 
-        <div class="github-link-container">
-            <a href="https://github.com/jkeifer/vischunk" target="_blank" class="github-link">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                </svg>
-                View on GitHub
-            </a>
+            <div class="overview-content">
+                <h2>What is chunking and linearization?</h2>
+                <p>
+
+                    When working with n-dimensional datasets in cloud storage,
+                    we face a fundamental challenge: n-dimensional data must be
+                    <strong>linearized</strong> into one dimension for storage
+                    and transfer. Linearization creates an inconsistency
+                    between how we conceptualize our data and how it's
+                    physically stored.
+
+                </p>
+                <p>
+
+                    <strong>Chunking</strong> divides large datasets into
+                    smaller blocks that serve as both the unit of compression
+                    and the minimum unit for reading. Especially in systems
+                    where data is read over a network, such as when
+                    cloud-native data is hosted in an object store like S3,
+                    chunk design critically impacts performance. Too small, and
+                    you may have to wait because of the latency assoicated with
+                    the overhead of excessive reads requests. Too large, and
+                    you may have to wait to download excessive amounts of
+                    unwanted data.
+
+                </p>
+                <p>
+
+                    This tool demonstrates how different chunking and
+                    linearization strategies affect read efficiency. Watch how
+                    query patterns interact with chunk boundaries to create
+                    <strong>read amplification</strong> (the ratio of data
+                    requested to how much data is actually read and
+                    transmitted). Notice that smaller chunks decrease read
+                    amplification, but can increase request count. See how
+                    different linearization algorithms (row-major,
+                    column-major, Z-order, Hilbert) change the preservation of
+                    spatial locality after linearization, and what effects that
+                    may have on read coalescing.
+
+                </p>
+                <p>To learn more about the complexities of chunking and how it has
+                   come to be such a concern, checkout these blog posts:
+                    <a href="https://teotl.dev/posts/2025/07/09/chunks-and-chunkability-tyranny-of-the-chunk/" target="_blank">The Tyranny of the Chunk</a> |
+                    <a href="https://teotl.dev/posts/2025/07/09/chunks-and-chunkability-an-origin-story/" target="_blank">An Origin Story</a>
+                </p>
+            </div>
+            <div class="github-link-container">
+                <a href="https://github.com/jkeifer/vischunk" target="_blank" class="github-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    view or contribute to this project on github
+                </a>
+            </div>
         </div>
 
         <div class="content-wrapper simulation-wrapper">
@@ -716,19 +992,19 @@
             </div>
 
             <div class="explanation-section">
-                <h3>Array Views (Top Row)</h3>
-                <p><strong>Left - Logical Array:</strong> Shows how individual cells are organized and linearized within chunks. Each cell's color represents its position in the combined linearization order.</p>
+                <h3>Array Views</h3>
+                <p><strong>Array Cells:</strong> Shows how individual cells are organized and linearized within chunks. Each cell's color represents its position in the combined linearization order.</p>
 
-                <p><strong>Right - Chunked Array:</strong> Displays chunk-level organization where all cells in the same chunk share the same color. This shows how chunks are linearized relative to each other.</p>
+                <p><strong>Array Chunks:</strong> Displays chunk-level organization where all cells in the same chunk share the same color. This shows how chunks are linearized relative to each other.</p>
 
                 <p><strong>Interactive Cross-highlighting:</strong> Hovering in one view highlights corresponding elements in all other views, helping you trace relationships between logical and physical layouts.</p>
             </div>
 
             <div class="explanation-section">
-                <h3>Linear Storage Views (Bottom Row)</h3>
-                <p><strong>Top Linear View:</strong> Shows how data is actually stored in linear memory, with the same cell-level coloring as the logical array. Blue regions indicate cells that need to be read.</p>
+                <h3>Linear Storage Views</h3>
+                <p><strong>Storage Linearization — Cells</strong> Shows how data is actually stored in linear memory, with the same cell-level coloring as the logical array. Blue regions indicate cells that need to be read.</p>
 
-                <p><strong>Bottom Linear View:</strong> Same linear layout but colored by chunks to show how chunking affects the distribution of read operations. Blue bars below show the byte ranges that need to be fetched.</p>
+                <p><strong>Storage Linearization — Chunks</strong> Same linear layout but colored by chunks to show how chunking affects the distribution of read operations. Blue bars below show the byte ranges that need to be fetched.</p>
 
                 <p><strong>Byte Range Indicators:</strong> Lines below each linear view show how many separate read operations are required - fewer ranges mean better I/O performance.</p>
             </div>
@@ -747,7 +1023,8 @@
 
                 <p><strong>Range Reads:</strong> Number of separate read operations needed. Fewer range reads reduce I/O overhead and improve performance.</p>
 
-                <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality.</p>
+                <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality. Note that this does not apply to formats that split chunks into individual files, like unsharded Zarr, where each chunk has to be read via a separate read request.</p>
+
                 <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read efficiency and coalescing. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
             </div>
 
@@ -766,11 +1043,11 @@
                 <h3>Optimization Tips</h3>
                 <p><strong>Match Access Patterns:</strong> Choose linearization algorithms that align with how your application accesses data most frequently.</p>
 
-                <p><strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead but may increase read amplification. Smaller chunks provide finer granularity but more management overhead.</p>
+                <p><strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead and number of reads, but increase read amplification. Smaller chunks decrease read ampliciation but increase read count and can have a management overhead penalty.</p>
 
-                <p><strong>Query Shape Matters:</strong> Square queries often work best with space-filling curves, while rectangular queries may favor row/column-major ordering.</p>
+                <p><strong>Query Shape Matters:</strong> Square queries often work best with space-filling curves, while rectangular queries favor row- or column-major ordering, per the rectangle orientation.</p>
 
-                <p><strong>Monitor Metrics:</strong> Use the real-time metrics to compare different configurations and find the optimal balance for your specific use case.</p>
+                <p><strong>Monitor Metrics:</strong> Use the metrics to compare different configurations and find the optimal balance for your specific use cases and data geometries.</p>
             </div>
         </div>
     </div>
