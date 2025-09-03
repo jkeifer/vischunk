@@ -1019,7 +1019,7 @@
 
                 <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality. Note that this does not apply to formats that split chunks into individual files, like unsharded Zarr, where each chunk has to be read via a separate read request.</p>
 
-                <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read ampliciation and coalescing in a weighted normalized average in the range 0 - 1. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
+                <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read amplification and coalescing in a weighted normalized average in the range 0 - 1. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
             </div>
 
             <div class="explanation-section">
@@ -1037,7 +1037,7 @@
                 <h3>Optimization Tips</h3>
                 <p><strong>Match Access Patterns:</strong> Choose linearization algorithms that align with how your application accesses data most frequently.</p>
 
-                <p><strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead and number of reads, but increase read amplification. Smaller chunks decrease read ampliciation but increase read count and can have a management overhead penalty.</p>
+                <p><strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead and number of reads, but increase read amplification. Smaller chunks decrease read amplification but increase read count and can have a management overhead penalty.</p>
 
                 <p><strong>Query Shape Matters:</strong> Square queries often work best with space-filling curves, while rectangular queries favor row- or column-major ordering, per the rectangle orientation.</p>
 
