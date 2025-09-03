@@ -17,7 +17,7 @@
             --color-warning: #ffc107;
             --color-success: #00ff00;
             --color-danger: #ff0000;
-            
+
             /* Colors - Backgrounds */
             --bg-primary: #1a1a2e;
             --bg-secondary: #2a2a3e;
@@ -29,7 +29,7 @@
             --bg-tooltip: rgba(0, 0, 0, 0.9);
             --bg-highlight: rgba(255, 255, 255, 0.4);
             --bg-warning: rgba(255, 200, 0, 0.1);
-            
+
             /* Colors - Text */
             --text-primary: #fff;
             --text-secondary: #eee;
@@ -38,7 +38,7 @@
             --text-dark: #333;
             --text-very-light: #ccc;
             --text-extra-light: #ddd;
-            
+
             /* Colors - Borders */
             --border-primary: rgba(255, 255, 255, 0.1);
             --border-secondary: rgba(255, 255, 255, 0.2);
@@ -46,7 +46,7 @@
             --border-input-focus: #4a9eff;
             --border-warning: rgba(255, 200, 0, 0.3);
             --border-light: rgba(255, 255, 255, 0.3);
-            
+
             /* Spacing Scale */
             --space-xs: 3px;
             --space-sm: 5px;
@@ -57,14 +57,14 @@
             --space-3xl: 25px;
             --space-4xl: 30px;
             --space-5xl: 40px;
-            
+
             /* Border Radius */
             --radius-sm: 3px;
             --radius-md: 5px;
             --radius-lg: 8px;
             --radius-xl: 10px;
             --radius-2xl: 15px;
-            
+
             /* Typography */
             --font-family: -apple-system, BlinkMacSystemFont, 'Segue UI', Roboto, sans-serif;
             --font-size-xs: 0.85em;
@@ -79,27 +79,27 @@
             --font-weight-medium: 500;
             --font-weight-semibold: 600;
             --font-weight-bold: 700;
-            
+
             /* Effects */
             --blur-sm: blur(5px);
             --blur-md: blur(10px);
             --transition-fast: 0.3s;
-            
+
             /* Layout */
             --max-width-content: 1600px;
             --max-width-text: 850px;
             --min-width-content: 320px;
-            
+
             /* Z-index Scale */
             --z-tooltip: 1000;
             --z-modal: 900;
             --z-overlay: 800;
-            
+
             /* Canvas */
             --canvas-max-size: 400px;
             --canvas-min-cell-size: 2px;
             --canvas-viewport-cell-size: 8px;
-            
+
             /* Gradients */
             --gradient-primary: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
             --gradient-metrics: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -170,7 +170,7 @@
             padding: var(--space-xl);
             backdrop-filter: var(--blur-md);
         }
-        
+
         .panel-primary {
             background: var(--gradient-primary);
             border-radius: var(--radius-2xl);
@@ -178,11 +178,11 @@
             backdrop-filter: var(--blur-md);
             border: 1px solid var(--border-primary);
         }
-        
+
         .blur-effect {
             backdrop-filter: var(--blur-md);
         }
-        
+
         .blur-effect-sm {
             backdrop-filter: var(--blur-sm);
         }
@@ -420,7 +420,7 @@
                 grid-row: auto;
             }
         }
-        
+
         /* Performance optimization: disable blur for low-end devices */
         @media (prefers-reduced-motion: reduce) {
             .blur-effect,
@@ -684,7 +684,7 @@
             .metrics {
                 grid-template-columns: repeat(8, 1fr);
             }
-            
+
             .explanation-content {
                 grid-template-columns: repeat(3, 1fr);
             }
@@ -3325,7 +3325,8 @@
                 const queryHeight = Math.abs(params.query.y[1] - params.query.y[0]) + 1;
                 const amplification = data.actualCells.size / Math.max(1, data.requestedCells.size);
                 const coalescingFactor = data.touchedChunks.size / Math.max(1, data.chunkedRanges.length);
-                const storageAlignment = 2 / (amplification + coalescingFactor);
+                const coalscingScore = 1 - ((data.chunkedRanges.length - 1) / Math.max(1, (data.touchedChunks.size - 1)))
+                const storageAlignment = 2 / (amplification + (1 / coalscingScore));
 
                 document.getElementById('requested-cells').textContent = data.requestedCells.size;
                 document.getElementById('actual-cells').textContent = data.actualCells.size;
