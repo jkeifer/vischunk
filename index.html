@@ -251,8 +251,6 @@
             gap: var(--space-xl);
         }
 
-        /* Removed problematic subgrid rules that were causing dropdown stacking */
-
         .section-title {
             font-weight: var(--font-weight-semibold);
             color: var(--text-primary);
@@ -340,8 +338,6 @@
             margin-bottom: var(--space-xl);
         }
 
-        /* Moved to consolidated media queries section at end */
-
         .viz-panel {
             background: var(--bg-panel-hover);
             border-radius: var(--radius-xl);
@@ -399,8 +395,6 @@
             background: var(--gradient-metrics);
             border-radius: var(--radius-xl);
         }
-
-        /* Moved to consolidated media queries section at end */
 
         .metric {
             background: var(--bg-input);
@@ -493,8 +487,6 @@
             margin-top: var(--space-xl);
         }
 
-        /* Moved to consolidated media queries section at end */
-
         .explanation-section {
             background: var(--bg-panel-hover);
             padding: var(--space-xl);
@@ -535,11 +527,7 @@
             border-radius: var(--radius-sm);
             margin-right: var(--space-md);
             vertical-align: middle;
-            border: 3px solid var(--text-primary);
         }
-
-
-        /* Removed unused classes - highlight-white and gradient-example */
 
         /* Hide Z dimension controls for now */
         .z-control {
@@ -568,6 +556,21 @@
             height: 20px;
             border-radius: var(--radius-sm);
             border: 1px solid var(--border-light);
+        }
+
+        .query-legend {
+            border: 3px solid var(--color-primary);
+            background: transparent;
+        }
+
+        .gradient-legend {
+            background: var(--gradient-color-scale);
+            border: none;
+        }
+
+        .highlight-legend {
+            border: 3px solid var(--text-primary);
+            background: transparent;
         }
 
         .reset-button {
@@ -666,15 +669,6 @@
             margin: 0;
             white-space: nowrap;
             flex-shrink: 0;
-        }
-
-        .gradient-legend {
-            background: var(--gradient-color-scale);
-        }
-
-        .query-legend {
-            border: 3px solid var(--color-primary);
-            background: transparent;
         }
 
         /* ========================================
@@ -984,11 +978,11 @@
         <div class="explanation-content">
             <div class="explanation-section">
                 <h3>Color Coding</h3>
-                <p><span class="color-example gradient-example"></span><strong>Green to Red Gradient:</strong> Shows the linearization order from first (green) to last (red) in memory. This helps you understand how different algorithms arrange data sequentially.</p>
+                <p><span class="color-example gradient-legend"></span><strong>Green to Red Gradient:</strong> Shows the linearization order from first (green) to last (red) in memory. This helps you understand how different algorithms arrange data sequentially.</p>
 
                 <p><span class="color-example query-legend"></span><strong>Blue Outlines:</strong> Indicate query regions and all cells that need to be read to satisfy the query. This includes both requested cells and extra cells read due to chunking.</p>
 
-                <p><span class="color-example highlight-white"></span><strong>White Overlays:</strong> Show currently hovered elements. Direct hovers have both overlay and outline, while cross-highlighted elements show only the overlay.</p>
+                <p><span class="color-example highlight-legend"></span><strong>White Overlays:</strong> Show currently hovered elements. Direct hovers have both overlay and outline, while cross-highlighted elements show only the overlay.</p>
             </div>
 
             <div class="explanation-section">
