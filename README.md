@@ -33,15 +33,19 @@ storage layouts and their impact on read performance.
 
 ### Real-time Metrics
 
+- **Cells Requesteds**: How many cells are in the query
+- **Cells Read**: How many cells have to be read to fulfill the query (due to chunking)
 - **Read Amplification**: How much extra data needs to be read due to chunking
-- **Efficiency**: Percentage of useful data in each read operation
-- **Byte Ranges**: Number of separate read operations required
+- **Read Efficiency**: Percentage of useful data in each read operation
 - **Chunks Touched**: How many chunks intersect with the query region
+- **Range Reads**: Number of separate read operations required
+- **Coalescing Factor**: How much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads)
+- **Storage Alignment**: Overall measure of how well your query aligns with the storage layout, combining read efficiency and coalescing.
 
 ## 🎮 How to Use
 
 1. **Configure Array Settings**: Set the dimensions of your multidimensional
-   array
+   array -- some interesting presets are provided.
 2. **Configure Chunk Settings**: Define how the array should be divided into
    chunks
 3. **Set Query Region**: Define the region of interest you want to read
@@ -123,3 +127,11 @@ This is a single-file HTML application. To contribute:
 ## 📄 License
 
 MIT License - feel free to use this for educational or commercial purposes.
+
+## Pronouncing "vischunk"
+
+Like any other aiming-to-be-trendy new age software gobbledygook, this `README`
+would not be complete without a pronunciation guide. So here it is.
+
+"Vischunk" is pronounced as "vie-chunk". The first syllable is the same as that
+in the four rank British peerage title "viscount". Because obviously.
