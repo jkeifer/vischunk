@@ -1101,251 +1101,69 @@
             }
         }
 
-        class CacheKeyGenerator {
-            static createLinearizationKey(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-                return `${x},${y},${z},${sizeX},${sizeY},${sizeZ},${algorithm}`;
+
+        class GridCoordinate {
+            constructor(sizeX, sizeY, sizeZ, algorithm, cache) {
+                this.sizeX = sizeX;
+                this.sizeY = sizeY;
+                this.sizeZ = Math.max(1, sizeZ || 1);
+                this.algorithm = algorithm || 'row-major';
+                this.cache = cache;
             }
 
-            static createCellPositionKey(algorithm, chunkX, chunkY, chunkZ) {
-                return `cell-${algorithm}-${chunkX}-${chunkY}-${chunkZ}`;
-            }
-
-            static createChunkPositionKey(algorithm, chunksX, chunksY) {
-                return `${algorithm}-${chunksX}-${chunksY}`;
-            }
-
-            static createChunkColorMapKey(chunksX, chunksY, chunksZ, algorithm) {
-                return `${chunksX},${chunksY},${chunksZ},${algorithm}`;
-            }
-
-            static createPositionToCellMapKey(sizeX, sizeY, cellAlgorithm, chunkAlgorithm, chunkSizeX, chunkSizeY) {
-                return `${sizeX},${sizeY},${cellAlgorithm},${chunkAlgorithm},${chunkSizeX},${chunkSizeY}`;
-            }
-
-            static createColorKey(position, maxPosition) {
-                return `${position}-${maxPosition}`;
-            }
-        }
-
-        class ChunkCoordinateManager {
-            constructor(chunkPositionCache) {
-                this.chunkPositionCache = chunkPositionCache;
-            }
-
-            getChunkCoordinatesFromSequentialIndex(sequentialIndex, params) {
-                const [sizeX, sizeY] = params.size;
-                const [chunkX, chunkY] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkX);
-                const chunksY = Math.ceil(sizeY / chunkY);
-
-                if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
-                    return this.getNonSequentialChunkCoordinates(sequentialIndex, params, chunksX, chunksY);
-                } else if (params.chunkAlgorithm === 'col-major') {
-                    return {
-                        cx: Math.floor(sequentialIndex / chunksY),
-                        cy: sequentialIndex % chunksY
-                    };
-                } else {
-                    // Row-major (default)
-                    return {
-                        cy: Math.floor(sequentialIndex / chunksX),
-                        cx: sequentialIndex % chunksX
-                    };
-                }
-            }
-
-            getNonSequentialChunkCoordinates(sequentialIndex, params, chunksX, chunksY) {
-                const cacheKey = CacheKeyGenerator.createChunkPositionKey(params.chunkAlgorithm, chunksX, chunksY);
-                const coordCacheKey = cacheKey + '-coords';
-
-                const coordMap = this.chunkPositionCache.get(coordCacheKey);
-                if (!coordMap || !coordMap.has(sequentialIndex)) {
-                    throw new Error(`Coordinate mapping not found for sequential position ${sequentialIndex} in algorithm ${params.chunkAlgorithm}`);
-                }
-                return coordMap.get(sequentialIndex);
-            }
-
-            calculateActualCellsInChunk(chunkCX, chunkCY, params) {
-                const [sizeX, sizeY] = params.size;
-                const [chunkX, chunkY] = params.chunk;
-
-                const startX = chunkCX * chunkX;
-                const startY = chunkCY * chunkY;
-                const endX = Math.min(startX + chunkX, sizeX);
-                const endY = Math.min(startY + chunkY, sizeY);
-
-                return (endX - startX) * (endY - startY);
-            }
-        }
-
-        class LinearizationEngine {
-            constructor(linearizationCache, positionCache, chunkPositionCache, cellPositionCache) {
-                this.linearizationCache = linearizationCache;
-                this.positionCache = positionCache;
-                this.chunkPositionCache = chunkPositionCache;
-                this.cellPositionCache = cellPositionCache;
-                this.chunkCoordManager = new ChunkCoordinateManager(chunkPositionCache);
-            }
-
-            linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-                const key = CacheKeyGenerator.createLinearizationKey(x, y, z, sizeX, sizeY, sizeZ, algorithm);
-                if (this.linearizationCache.has(key)) {
-                    return this.linearizationCache.get(key);
+            linearize(x, y, z = 0) {
+                const cacheKey = JSON.stringify([x, y, z, this.sizeX, this.sizeY, this.sizeZ, this.algorithm]);
+                if (this.cache && this.cache.has(cacheKey)) {
+                    return this.cache.get(cacheKey);
                 }
 
-                let result = this.calculateLinearPosition(x, y, z, sizeX, sizeY, sizeZ, algorithm);
-                this.linearizationCache.set(key, result);
+                const result = this.calculateLinearPosition(x, y, z);
+                if (this.cache) {
+                    this.cache.set(cacheKey, result);
+                }
                 return result;
             }
 
-            calculateLinearPosition(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-                switch(algorithm) {
+            calculateLinearPosition(x, y, z) {
+                switch(this.algorithm) {
                     case 'row-major':
-                        return x + y * sizeX + z * sizeX * sizeY;
+                        return x + y * this.sizeX + z * this.sizeX * this.sizeY;
                     case 'col-major':
-                        return y + x * sizeY + z * sizeX * sizeY;
+                        return y + x * this.sizeY + z * this.sizeX * this.sizeY;
                     case 'z-order':
-                        return sizeZ > 0 ? this.mortonEncode3D(x, y, z) : this.mortonEncode2D(x, y);
+                        return this.sizeZ > 1 ? this.mortonEncode3D(x, y, z) : this.mortonEncode2D(x, y);
                     case 'hilbert':
-                        if (sizeZ > 0) {
-                            return z * sizeX * sizeY + this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        if (this.sizeZ > 1) {
+                            return z * this.sizeX * this.sizeY + this.hilbertEncode2D(x, y, Math.max(this.sizeX, this.sizeY));
                         } else {
-                            return this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                            return this.hilbertEncode2D(x, y, Math.max(this.sizeX, this.sizeY));
                         }
                     default:
-                        return x + y * sizeX + z * sizeX * sizeY;
+                        return x + y * this.sizeX + z * this.sizeX * this.sizeY;
                 }
             }
 
-            getIntraChunkPosition(x, y, z, params) {
-                const [chunkX, chunkY, chunkZ] = params.chunk;
-                const localX = x % chunkX;
-                const localY = y % chunkY;
-                const localZ = z % chunkZ;
-                const rawPos = this.linearizeCoordinate(localX, localY, localZ, chunkX, chunkY, chunkZ, params.cellAlgorithm);
-
-                if (params.cellAlgorithm === 'z-order' || params.cellAlgorithm === 'hilbert') {
-                    return this.getNormalizedCellPosition(rawPos, params, chunkX, chunkY, chunkZ);
-                }
-
-                return rawPos;
+            getBounds(gridX, gridY, gridZ = 0, nominalSizeX, nominalSizeY, nominalSizeZ = 1) {
+                const startX = gridX * nominalSizeX;
+                const startY = gridY * nominalSizeY;
+                const startZ = gridZ * nominalSizeZ;
+                const endX = Math.min(startX + nominalSizeX, this.sizeX);
+                const endY = Math.min(startY + nominalSizeY, this.sizeY);
+                const endZ = Math.min(startZ + nominalSizeZ, this.sizeZ);
+                return { startX, startY, startZ, endX, endY, endZ };
             }
 
-            getNormalizedCellPosition(rawPos, params, chunkX, chunkY, chunkZ) {
-                const cacheKey = CacheKeyGenerator.createCellPositionKey(params.cellAlgorithm, chunkX, chunkY, chunkZ);
-
-                if (!this.cellPositionCache.has(cacheKey)) {
-                    this.buildCellPositionCache(cacheKey, params, chunkX, chunkY, chunkZ);
-                }
-
-                const positionMap = this.cellPositionCache.get(cacheKey);
-                if (!positionMap || !positionMap.has(rawPos)) {
-                    throw new Error(`Cell position ${rawPos} not found in cache for algorithm ${params.cellAlgorithm}`);
-                }
-                return positionMap.get(rawPos);
+            getDimensions(gridX, gridY, gridZ = 0, nominalSizeX, nominalSizeY, nominalSizeZ = 1) {
+                const bounds = this.getBounds(gridX, gridY, gridZ, nominalSizeX, nominalSizeY, nominalSizeZ);
+                return {
+                    actualX: bounds.endX - bounds.startX,
+                    actualY: bounds.endY - bounds.startY,
+                    actualZ: bounds.endZ - bounds.startZ
+                };
             }
 
-            buildCellPositionCache(cacheKey, params, chunkX, chunkY, chunkZ) {
-                const allCellPositions = [];
-                for (let cz = 0; cz < Math.max(1, chunkZ); cz++) {
-                    for (let cy = 0; cy < chunkY; cy++) {
-                        for (let cx = 0; cx < chunkX; cx++) {
-                            const pos = this.linearizeCoordinate(cx, cy, cz, chunkX, chunkY, chunkZ, params.cellAlgorithm);
-                            allCellPositions.push(pos);
-                        }
-                    }
-                }
-                allCellPositions.sort((a, b) => a - b);
-
-                const positionMap = new Map();
-                allCellPositions.forEach((pos, seqIndex) => {
-                    positionMap.set(pos, seqIndex);
-                });
-                this.cellPositionCache.set(cacheKey, positionMap);
-            }
-
-            getInterChunkPosition(x, y, z, params) {
-                const [sizeX, sizeY, sizeZ] = params.size;
-                const [chunkX, chunkY, chunkZ] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkX);
-                const chunksY = Math.ceil(sizeY / chunkY);
-                const chunksZ = Math.ceil(sizeZ / chunkZ);
-                const chunkCX = Math.floor(x / chunkX);
-                const chunkCY = Math.floor(y / chunkY);
-                const chunkCZ = Math.floor(z / chunkZ);
-                return this.linearizeCoordinate(chunkCX, chunkCY, chunkCZ, chunksX, chunksY, chunksZ, params.chunkAlgorithm);
-            }
-
-            getNormalizedChunkPosition(x, y, z, params) {
-                const rawChunkPos = this.getInterChunkPosition(x, y, z, params);
-
-                if (params.chunkAlgorithm === 'z-order' || params.chunkAlgorithm === 'hilbert') {
-                    return this.getNormalizedNonSequentialChunkPosition(rawChunkPos, params);
-                }
-
-                return rawChunkPos;
-            }
-
-            getNormalizedNonSequentialChunkPosition(rawChunkPos, params) {
-                const [sizeX, sizeY] = params.size;
-                const [chunkX, chunkY] = params.chunk;
-                const chunksX = Math.ceil(sizeX / chunkX);
-                const chunksY = Math.ceil(sizeY / chunkY);
-
-                const cacheKey = CacheKeyGenerator.createChunkPositionKey(params.chunkAlgorithm, chunksX, chunksY);
-
-                if (!this.chunkPositionCache.has(cacheKey)) {
-                    this.buildChunkPositionCache(cacheKey, params, chunksX, chunksY, chunkX, chunkY);
-                }
-
-                const positionMap = this.chunkPositionCache.get(cacheKey);
-                if (!positionMap || !positionMap.has(rawChunkPos)) {
-                    throw new Error(`Chunk position ${rawChunkPos} not found in cache for algorithm ${params.chunkAlgorithm}`);
-                }
-                return positionMap.get(rawChunkPos);
-            }
-
-            buildChunkPositionCache(cacheKey, params, chunksX, chunksY, chunkX, chunkY) {
-                const allChunkPositions = [];
-                for (let cy = 0; cy < chunksY; cy++) {
-                    for (let cx = 0; cx < chunksX; cx++) {
-                        const tempX = cx * chunkX;
-                        const tempY = cy * chunkY;
-                        const pos = this.getInterChunkPosition(tempX, tempY, 0, params);
-                        allChunkPositions.push({pos, index: cy * chunksX + cx, cx, cy});
-                    }
-                }
-                allChunkPositions.sort((a, b) => a.pos - b.pos);
-
-                const positionMap = new Map();
-                const coordMap = new Map();
-                allChunkPositions.forEach((item, seqIndex) => {
-                    positionMap.set(item.pos, seqIndex);
-                    coordMap.set(seqIndex, {cx: item.cx, cy: item.cy});
-                });
-                this.chunkPositionCache.set(cacheKey, positionMap);
-                this.chunkPositionCache.set(cacheKey + '-coords', coordMap);
-            }
-
-            getGlobalPosition(x, y, z, params) {
-                const [sizeX, sizeY] = params.size;
-                const [chunkX, chunkY, chunkZ] = params.chunk;
-
-                const normalizedChunkPos = this.getNormalizedChunkPosition(x, y, z, params);
-                const cellsBeforeThisChunk = this.calculateCellsBeforeChunk(normalizedChunkPos, params);
-                const intraChunkPos = this.getIntraChunkPosition(x, y, z, params);
-
-                return cellsBeforeThisChunk + intraChunkPos;
-            }
-
-            calculateCellsBeforeChunk(normalizedChunkPos, params) {
-                let cellsBeforeThisChunk = 0;
-                for (let i = 0; i < normalizedChunkPos; i++) {
-                    const chunkCoords = this.chunkCoordManager.getChunkCoordinatesFromSequentialIndex(i, params);
-                    const actualCellsInChunk = this.chunkCoordManager.calculateActualCellsInChunk(chunkCoords.cx, chunkCoords.cy, params);
-                    cellsBeforeThisChunk += actualCellsInChunk;
-                }
-                return cellsBeforeThisChunk;
+            getTotalCells() {
+                return this.sizeX * this.sizeY * this.sizeZ;
             }
 
             mortonEncode2D(x, y) {
@@ -1393,6 +1211,244 @@
                     [x, y] = [y, x];
                 }
                 return [x, y];
+            }
+        }
+
+        class CellCoordinate extends GridCoordinate {
+            constructor(cellSizeX, cellSizeY, cellSizeZ, cellAlgorithm, chunkGrid, chunkSizeX, chunkSizeY, chunkSizeZ, cache) {
+                super(cellSizeX, cellSizeY, cellSizeZ, cellAlgorithm, cache);
+                this.chunkGrid = chunkGrid;
+                this.chunkSizeX = chunkSizeX;
+                this.chunkSizeY = chunkSizeY;
+                this.chunkSizeZ = chunkSizeZ;
+            }
+
+            getParentChunk(cellX, cellY, cellZ = 0) {
+                return {
+                    x: Math.floor(cellX / this.chunkSizeX),
+                    y: Math.floor(cellY / this.chunkSizeY),
+                    z: Math.floor(cellZ / this.chunkSizeZ)
+                };
+            }
+
+            getGlobalIndex(cellX, cellY, cellZ = 0) {
+                const chunk = this.getParentChunk(cellX, cellY, cellZ);
+
+                // Get the linearized chunk position from the chunk grid
+                let chunkIndex = this.chunkGrid.linearize(chunk.x, chunk.y, chunk.z);
+
+                // For space-filling curves, we need to normalize the chunk index like the original code
+                if (this.chunkGrid.algorithm === 'z-order' || this.chunkGrid.algorithm === 'hilbert') {
+                    chunkIndex = this.getNormalizedChunkIndex(chunkIndex, chunk);
+                }
+
+                // Calculate cells before this chunk
+                const cellsBeforeThisChunk = this.calculateCellsBeforeChunk(chunkIndex);
+
+                // Get local cell position within this chunk
+                const localCellIndex = this.getLocalCellIndex(cellX, cellY, cellZ, chunk);
+
+                return cellsBeforeThisChunk + localCellIndex;
+            }
+
+            getLocalCellIndex(cellX, cellY, cellZ, chunk) {
+                // Calculate the bounds of this chunk in cell coordinates
+                const chunkStartX = chunk.x * this.chunkSizeX;
+                const chunkStartY = chunk.y * this.chunkSizeY;
+                const chunkStartZ = chunk.z * this.chunkSizeZ;
+                const chunkEndX = Math.min(chunkStartX + this.chunkSizeX, this.sizeX);
+                const chunkEndY = Math.min(chunkStartY + this.chunkSizeY, this.sizeY);
+                const chunkEndZ = Math.min(chunkStartZ + this.chunkSizeZ, this.sizeZ);
+
+                // Calculate local coordinates within this specific chunk
+                const localX = cellX - chunkStartX;
+                const localY = cellY - chunkStartY;
+                const localZ = cellZ - chunkStartZ;
+
+                // Calculate actual chunk dimensions (handles partial chunks) - THE KEY FIX
+                const actualChunkX = chunkEndX - chunkStartX;
+                const actualChunkY = chunkEndY - chunkStartY;
+                const actualChunkZ = chunkEndZ - chunkStartZ;
+
+                // Get raw linearization position using actual dimensions
+                const rawPos = this.calculateLinearPosition(localX, localY, localZ, actualChunkX, actualChunkY, actualChunkZ);
+
+                // For space-filling curves, we need normalization like the original code
+                if (this.algorithm === 'z-order' || this.algorithm === 'hilbert') {
+                    return this.getNormalizedLocalPosition(rawPos, chunk, actualChunkX, actualChunkY, actualChunkZ);
+                }
+
+                return rawPos;
+            }
+
+            calculateLinearPosition(x, y, z, sizeX, sizeY, sizeZ) {
+                // This replicates the original calculateLinearPosition logic exactly
+                switch(this.algorithm) {
+                    case 'row-major':
+                        return x + y * sizeX + z * sizeX * sizeY;
+                    case 'col-major':
+                        return y + x * sizeY + z * sizeX * sizeY;
+                    case 'z-order':
+                        return sizeZ > 1 ? this.mortonEncode3D(x, y, z) : this.mortonEncode2D(x, y);
+                    case 'hilbert':
+                        if (sizeZ > 1) {
+                            return z * sizeX * sizeY + this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        } else {
+                            return this.hilbertEncode2D(x, y, Math.max(sizeX, sizeY));
+                        }
+                    default:
+                        return x + y * sizeX + z * sizeX * sizeY;
+                }
+            }
+
+            getNormalizedLocalPosition(rawPos, chunk, actualChunkX, actualChunkY, actualChunkZ) {
+                // Build the position mapping for this specific chunk (like original getNormalizedCellPosition)
+                const cacheKey = JSON.stringify([chunk.x, chunk.y, chunk.z, actualChunkX, actualChunkY, actualChunkZ, this.algorithm]);
+
+                if (!this.localPositionCache) {
+                    this.localPositionCache = new Map();
+                }
+
+                if (!this.localPositionCache.has(cacheKey)) {
+                    // Build all positions for this chunk and sort them
+                    const positions = [];
+                    for (let lz = 0; lz < actualChunkZ; lz++) {
+                        for (let ly = 0; ly < actualChunkY; ly++) {
+                            for (let lx = 0; lx < actualChunkX; lx++) {
+                                const pos = this.calculateLinearPosition(lx, ly, lz, actualChunkX, actualChunkY, actualChunkZ);
+                                positions.push(pos);
+                            }
+                        }
+                    }
+                    positions.sort((a, b) => a - b);
+
+                    const positionMap = new Map();
+                    positions.forEach((pos, seqIndex) => {
+                        positionMap.set(pos, seqIndex);
+                    });
+                    this.localPositionCache.set(cacheKey, positionMap);
+                }
+
+                const positionMap = this.localPositionCache.get(cacheKey);
+                const result = positionMap.get(rawPos);
+                if (result === undefined) {
+                    throw new Error(`Invalid rawPos ${rawPos} not found in position map for chunk`);
+                }
+                return result;
+            }
+
+            getNormalizedChunkIndex(rawChunkIndex, chunk) {
+                // Build the normalization map for the chunk grid (like original code)
+                const chunksX = this.chunkGrid.sizeX;
+                const chunksY = this.chunkGrid.sizeY;
+                const chunksZ = this.chunkGrid.sizeZ;
+                const cacheKey = JSON.stringify([chunksX, chunksY, chunksZ, this.chunkGrid.algorithm]);
+
+                if (!this.chunkNormalizationCache) {
+                    this.chunkNormalizationCache = new Map();
+                }
+
+                if (!this.chunkNormalizationCache.has(cacheKey)) {
+                    // Build all chunk positions and sort them like the original code
+                    const positions = [];
+                    for (let cz = 0; cz < chunksZ; cz++) {
+                        for (let cy = 0; cy < chunksY; cy++) {
+                            for (let cx = 0; cx < chunksX; cx++) {
+                                const rawPos = this.chunkGrid.calculateLinearPosition(cx, cy, cz);
+                                positions.push({ rawPos, cx, cy, cz });
+                            }
+                        }
+                    }
+                    positions.sort((a, b) => a.rawPos - b.rawPos);
+
+                    const normalizationMap = new Map();
+                    const reverseMap = new Map();
+                    positions.forEach((item, seqIndex) => {
+                        normalizationMap.set(item.rawPos, seqIndex);
+                        reverseMap.set(seqIndex, { x: item.cx, y: item.cy, z: item.cz });
+                    });
+                    this.chunkNormalizationCache.set(cacheKey, normalizationMap);
+                    this.chunkNormalizationCache.set(cacheKey + '-reverse', reverseMap);
+                }
+
+                const normalizationMap = this.chunkNormalizationCache.get(cacheKey);
+                const result = normalizationMap.get(rawChunkIndex);
+                if (result === undefined) {
+                    throw new Error(`Invalid rawChunkIndex ${rawChunkIndex} not found in normalization map`);
+                }
+                return result;
+            }
+
+            calculateCellsBeforeChunk(chunkIndex) {
+                let cellsBeforeThisChunk = 0;
+
+                // Iterate through all chunks before this one in linearization order
+                for (let i = 0; i < chunkIndex; i++) {
+                    // Get chunk coordinates from sequential index
+                    const chunkCoords = this.delinearizeChunkIndex(i);
+
+                    // Calculate actual cells in that chunk using direct bounds calculation
+                    const chunkStartX = chunkCoords.x * this.chunkSizeX;
+                    const chunkStartY = chunkCoords.y * this.chunkSizeY;
+                    const chunkStartZ = chunkCoords.z * this.chunkSizeZ;
+                    const chunkEndX = Math.min(chunkStartX + this.chunkSizeX, this.sizeX);
+                    const chunkEndY = Math.min(chunkStartY + this.chunkSizeY, this.sizeY);
+                    const chunkEndZ = Math.min(chunkStartZ + this.chunkSizeZ, this.sizeZ);
+
+                    const actualCellsInChunk = (chunkEndX - chunkStartX) * (chunkEndY - chunkStartY) * (chunkEndZ - chunkStartZ);
+                    cellsBeforeThisChunk += actualCellsInChunk;
+                }
+
+                return cellsBeforeThisChunk;
+            }
+
+            delinearizeChunkIndex(chunkIndex) {
+                // Use the chunk grid dimensions, not the cell grid dimensions
+                const chunksX = this.chunkGrid.sizeX;
+                const chunksY = this.chunkGrid.sizeY;
+                const chunksZ = this.chunkGrid.sizeZ;
+
+                // For space-filling curves, use the reverse map from normalization
+                if (this.chunkGrid.algorithm === 'z-order' || this.chunkGrid.algorithm === 'hilbert') {
+                    const cacheKey = JSON.stringify([chunksX, chunksY, chunksZ, this.chunkGrid.algorithm]);
+                    if (this.chunkNormalizationCache && this.chunkNormalizationCache.has(cacheKey + '-reverse')) {
+                        const reverseMap = this.chunkNormalizationCache.get(cacheKey + '-reverse');
+                        const result = reverseMap.get(chunkIndex);
+                        if (result === undefined) {
+                            throw new Error(`Invalid chunkIndex ${chunkIndex} not found in reverse map`);
+                        }
+                        return result;
+                    }
+                }
+
+                // For row-major and col-major, use direct calculation
+                switch(this.chunkGrid.algorithm) {
+                    case 'row-major':
+                        const z_rm = Math.floor(chunkIndex / (chunksX * chunksY));
+                        const xyIndex_rm = chunkIndex % (chunksX * chunksY);
+                        return {
+                            x: xyIndex_rm % chunksX,
+                            y: Math.floor(xyIndex_rm / chunksX),
+                            z: z_rm
+                        };
+                    case 'col-major':
+                        const z_cm = Math.floor(chunkIndex / (chunksX * chunksY));
+                        const xyIndex_cm = chunkIndex % (chunksX * chunksY);
+                        return {
+                            x: Math.floor(xyIndex_cm / chunksY),
+                            y: xyIndex_cm % chunksY,
+                            z: z_cm
+                        };
+                    default:
+                        // Fallback to row-major
+                        const z_default = Math.floor(chunkIndex / (chunksX * chunksY));
+                        const xyIndex_default = chunkIndex % (chunksX * chunksY);
+                        return {
+                            x: xyIndex_default % chunksX,
+                            y: Math.floor(xyIndex_default / chunksX),
+                            z: z_default
+                        };
+                }
             }
         }
 
@@ -1596,7 +1652,7 @@
 
             getSpatialCellLayout(canvas, sizeX, sizeY) {
                 const dpr = window.devicePixelRatio || 1;
-                const cacheKey = `${canvas.width}x${canvas.height}_${sizeX}x${sizeY}_${dpr}`;
+                const cacheKey = JSON.stringify([canvas.width, canvas.height, sizeX, sizeY, dpr]);
                 if (this.cellLayoutCache.has(cacheKey)) {
                     return this.cellLayoutCache.get(cacheKey);
                 }
@@ -1635,7 +1691,7 @@
 
             getLinearBarLayout(canvas, totalCells) {
                 const dpr = window.devicePixelRatio || 1;
-                const cacheKey = `linear_${canvas.width}x${canvas.height}_${totalCells}_${dpr}`;
+                const cacheKey = JSON.stringify([canvas.width, canvas.height, totalCells, dpr]);
                 if (this.linearLayoutCache.has(cacheKey)) {
                     return this.linearLayoutCache.get(cacheKey);
                 }
@@ -1669,13 +1725,6 @@
                 };
             }
 
-            getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY) {
-                const startX = chunkCX * chunkX;
-                const startY = chunkCY * chunkY;
-                const endX = Math.min(startX + chunkX, sizeX);
-                const endY = Math.min(startY + chunkY, sizeY);
-                return { startX, startY, endX, endY };
-            }
 
             getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY) {
                 return {
@@ -1701,7 +1750,7 @@
             static generateChunkTooltip(chunk, params, sizeX, sizeY, chunkX, chunkY, visualizer) {
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunkIdx = chunk.x + chunk.y * chunksX;
-                const bounds = visualizer.coordinateService.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
+                const bounds = visualizer.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
                 const interChunkPos = visualizer.getInterChunkPosition(bounds.startX, bounds.startY, 0, params);
 
                 return `Chunk ${chunkIdx}: cells (${bounds.startX},${bounds.startY}) to (${bounds.endX - 1},${bounds.endY - 1}), Linear pos: ${interChunkPos}`;
@@ -1958,7 +2007,7 @@
 
             drawChunkCellHighlights(params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
-                const bounds = this.coordinateService.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkSizeX, chunkSizeY, sizeX, sizeY);
+                const bounds = this.visualizer.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkSizeX, chunkSizeY, sizeX, sizeY);
                 this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
             }
         }
@@ -2025,7 +2074,7 @@
                 const colorIndex = chunkColorMap.get(chunkKey);
                 const color = this.visualizer.getColorForLinearPosition(colorIndex, totalChunks - 1);
 
-                const bounds = this.coordinateService.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
+                const bounds = this.visualizer.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
                 const chunkPixelWidth = (bounds.endX - bounds.startX) * cellSize;
                 const chunkPixelHeight = (bounds.endY - bounds.startY) * cellSize;
 
@@ -2054,14 +2103,14 @@
 
                 if (effectiveCell) {
                     const chunkCoords = this.coordinateService.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
-                    const bounds = this.coordinateService.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
+                    const bounds = this.visualizer.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
                     this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', '#fff');
                 }
 
                 this.drawTouchedChunksOutline(data, params, sizeX, sizeY, cellSize, offsetX, offsetY);
 
                 if (effectiveChunk && !effectiveCell) {
-                    const bounds = this.coordinateService.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
+                    const bounds = this.visualizer.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
                     this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
                 }
             }
@@ -2853,13 +2902,8 @@
                 this.cellPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
                 this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
 
-                // Initialize linearization engine
-                this.linearizationEngine = new LinearizationEngine(
-                    this.linearizationCache,
-                    this.positionCache,
-                    this.chunkPositionCache,
-                    this.cellPositionCache
-                );
+                // Initialize coordinate system cache
+                this.cellCoordinateCache = new Map();
 
                 // Initialize canvas manager
                 this.canvasManager = new CanvasManager(this);
@@ -3043,25 +3087,99 @@
                 };
             }
 
-            // Delegate to LinearizationEngine methods
+            // Create or get cached CellCoordinate system for given params
+            getCellCoordinateSystem(params) {
+                const [sizeX, sizeY, sizeZ = 1] = params.size;
+                const [chunkX, chunkY, chunkZ = 1] = params.chunk;
+                const { cellAlgorithm = 'row-major', chunkAlgorithm = 'row-major' } = params;
+
+                // Create cache key for this configuration
+                const cacheKey = JSON.stringify([sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, cellAlgorithm, chunkAlgorithm]);
+
+                // Check if we have a cached system for this configuration
+                if (this.cellCoordinateCache.has(cacheKey)) {
+                    return this.cellCoordinateCache.get(cacheKey);
+                }
+
+                // Calculate number of chunks in each dimension
+                const chunksX = Math.ceil(sizeX / chunkX);
+                const chunksY = Math.ceil(sizeY / chunkY);
+                const chunksZ = Math.ceil(sizeZ / chunkZ);
+
+                // Create chunk grid coordinate system (represents the chunk layout, not individual chunk contents)
+                const chunkGrid = new GridCoordinate(chunksX, chunksY, chunksZ, chunkAlgorithm, this.chunkPositionCache);
+
+                // Create cell coordinate system
+                const cellCoordinate = new CellCoordinate(
+                    sizeX, sizeY, sizeZ,
+                    cellAlgorithm,
+                    chunkGrid,
+                    chunkX, chunkY, chunkZ,
+                    this.linearizationCache
+                );
+
+                // Cache and return
+                this.cellCoordinateCache.set(cacheKey, cellCoordinate);
+                return cellCoordinate;
+            }
+
+            // Updated delegate methods using CellCoordinate
             linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-                return this.linearizationEngine.linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm);
+                // Create a temporary grid for standalone linearization
+                const tempGrid = new GridCoordinate(sizeX, sizeY, sizeZ, algorithm, this.linearizationCache);
+                return tempGrid.linearize(x, y, z);
             }
 
             getIntraChunkPosition(x, y, z, params) {
-                return this.linearizationEngine.getIntraChunkPosition(x, y, z, params);
+                const [sizeX, sizeY, sizeZ = 1] = params.size;
+                const [chunkX, chunkY, chunkZ = 1] = params.chunk;
+
+                // Calculate which chunk this cell belongs to
+                const chunkCX = Math.floor(x / chunkX);
+                const chunkCY = Math.floor(y / chunkY);
+                const chunkCZ = Math.floor(z / chunkZ);
+
+                // Calculate actual chunk bounds (this is the key fix)
+                const chunkStartX = chunkCX * chunkX;
+                const chunkStartY = chunkCY * chunkY;
+                const chunkStartZ = chunkCZ * chunkZ;
+                const actualChunkX = Math.min(chunkStartX + chunkX, sizeX) - chunkStartX;
+                const actualChunkY = Math.min(chunkStartY + chunkY, sizeY) - chunkStartY;
+                const actualChunkZ = Math.min(chunkStartZ + chunkZ, sizeZ) - chunkStartZ;
+
+                // Calculate local coordinates within this chunk
+                const localX = x - chunkStartX;
+                const localY = y - chunkStartY;
+                const localZ = z - chunkStartZ;
+
+                // Use the original linearization logic with actual chunk dimensions
+                return this.linearizeCoordinate(localX, localY, localZ, actualChunkX, actualChunkY, actualChunkZ, params.cellAlgorithm);
             }
 
             getInterChunkPosition(x, y, z, params) {
-                return this.linearizationEngine.getInterChunkPosition(x, y, z, params);
+                const cellCoord = this.getCellCoordinateSystem(params);
+                const chunk = cellCoord.getParentChunk(x, y, z);
+                return cellCoord.chunkGrid.linearize(chunk.x, chunk.y, chunk.z);
             }
 
             getNormalizedChunkPosition(x, y, z, params) {
-                return this.linearizationEngine.getNormalizedChunkPosition(x, y, z, params);
+                // This method seems to be used for cache compatibility - for now delegate to getInterChunkPosition
+                return this.getInterChunkPosition(x, y, z, params);
             }
 
             getGlobalPosition(x, y, z, params) {
-                return this.linearizationEngine.getGlobalPosition(x, y, z, params);
+                const cellCoord = this.getCellCoordinateSystem(params);
+                return cellCoord.getGlobalIndex(x, y, z);
+            }
+
+            // Helper method for renderers to get chunk bounds using new coordinate system
+            getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY) {
+                // Calculate chunk bounds directly - this is simple math, no need for complex coordinate system
+                const startX = chunkCX * chunkX;
+                const startY = chunkCY * chunkY;
+                const endX = Math.min(startX + chunkX, sizeX);
+                const endY = Math.min(startY + chunkY, sizeY);
+                return { startX, startY, endX, endY };
             }
 
             // Get the range of global positions for a chunk
@@ -3102,7 +3220,7 @@
             }
 
             getColorForLinearPosition(position, maxPosition) {
-                const key = CacheKeyGenerator.createColorKey(position, maxPosition);
+                const key = `${position}-${maxPosition}`;
 
                 const cachedColor = this.colorCache.get(key);
                 if (cachedColor) {
@@ -3264,7 +3382,7 @@
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
                 const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
-                const cacheKey = CacheKeyGenerator.createChunkColorMapKey(chunksX, chunksY, chunksZ, params.chunkAlgorithm);
+                const cacheKey = JSON.stringify([chunksX, chunksY, chunksZ, params.chunkAlgorithm]);
 
                 let chunkColorMap = this.positionCache.get(cacheKey);
                 if (!chunkColorMap) {
@@ -3298,9 +3416,7 @@
 
             getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
-                const cacheKey = CacheKeyGenerator.createPositionToCellMapKey(
-                    sizeX, sizeY, params.cellAlgorithm, params.chunkAlgorithm, chunkSizeX, chunkSizeY
-                );
+                const cacheKey = JSON.stringify([sizeX, sizeY, params.cellAlgorithm, params.chunkAlgorithm, chunkSizeX, chunkSizeY]);
 
                 let positionToCell = this.positionCache.get(cacheKey);
                 if (!positionToCell) {
