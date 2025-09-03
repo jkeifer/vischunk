@@ -1025,7 +1025,7 @@
 
                 <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality. Note that this does not apply to formats that split chunks into individual files, like unsharded Zarr, where each chunk has to be read via a separate read request.</p>
 
-                <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read efficiency and coalescing. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
+                <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read ampliciation and coalescing in a weighted normalized average in the range 0 - 1. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
             </div>
 
             <div class="explanation-section">
@@ -1742,16 +1742,16 @@
 
         class TooltipContentGenerator {
             static generateCellTooltip(cell, params, visualizer) {
-                const intraChunkPos = visualizer.getIntraChunkPosition(cell.x, cell.y, 0, params);
-                const globalPos = visualizer.getGlobalPosition(cell.x, cell.y, 0, params);
+                const intraChunkPos = visualizer.simulationModel.getIntraChunkPosition(cell.x, cell.y, 0, params);
+                const globalPos = visualizer.simulationModel.getGlobalPosition(cell.x, cell.y, 0, params);
                 return `Cell (${cell.x}, ${cell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`;
             }
 
             static generateChunkTooltip(chunk, params, sizeX, sizeY, chunkX, chunkY, visualizer) {
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunkIdx = chunk.x + chunk.y * chunksX;
-                const bounds = visualizer.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
-                const interChunkPos = visualizer.getInterChunkPosition(bounds.startX, bounds.startY, 0, params);
+                const bounds = visualizer.simulationModel.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
+                const interChunkPos = visualizer.simulationModel.getInterChunkPosition(bounds.startX, bounds.startY, 0, params);
 
                 return `Chunk ${chunkIdx}: cells (${bounds.startX},${bounds.startY}) to (${bounds.endX - 1},${bounds.endY - 1}), Linear pos: ${interChunkPos}`;
             }
@@ -1978,7 +1978,7 @@
             drawCellRange(params, data, startX, endX, startY, endY, cellSize, offsetX, offsetY) {
                 for (let y = startY; y < endY; y++) {
                     for (let x = startX; x < endX; x++) {
-                        const globalPos = this.visualizer.getGlobalPosition(x, y, 0, params);
+                        const globalPos = this.visualizer.simulationModel.getGlobalPosition(x, y, 0, params);
                         const color = this.visualizer.getColorForLinearPosition(globalPos, data.totalCells - 1);
 
                         this.ctx.fillStyle = color;
@@ -2007,7 +2007,7 @@
 
             drawChunkCellHighlights(params, effectiveChunk, sizeX, sizeY, cellSize, offsetX, offsetY) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
-                const bounds = this.visualizer.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkSizeX, chunkSizeY, sizeX, sizeY);
+                const bounds = this.visualizer.simulationModel.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkSizeX, chunkSizeY, sizeX, sizeY);
                 this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
             }
         }
@@ -2019,7 +2019,7 @@
                 const [sizeX, sizeY, sizeZ] = params.size;
                 const { cellSize, offsetX, offsetY } = this.coordinateService.getSpatialCellLayout(this.canvas, sizeX, sizeY);
 
-                const chunkColorMap = this.visualizer.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
+                const chunkColorMap = this.visualizer.simulationModel.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
                 this.drawChunkGrid(params, chunkColorMap, sizeX, sizeY, sizeZ, cellSize, offsetX, offsetY);
                 this.drawChunkedViewHighlights(params, data, sizeX, sizeY, cellSize, offsetX, offsetY);
             }
@@ -2074,7 +2074,7 @@
                 const colorIndex = chunkColorMap.get(chunkKey);
                 const color = this.visualizer.getColorForLinearPosition(colorIndex, totalChunks - 1);
 
-                const bounds = this.visualizer.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
+                const bounds = this.visualizer.simulationModel.getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY);
                 const chunkPixelWidth = (bounds.endX - bounds.startX) * cellSize;
                 const chunkPixelHeight = (bounds.endY - bounds.startY) * cellSize;
 
@@ -2103,14 +2103,14 @@
 
                 if (effectiveCell) {
                     const chunkCoords = this.coordinateService.getChunkCoordinatesFromCell(effectiveCell.x, effectiveCell.y, chunkX, chunkY);
-                    const bounds = this.visualizer.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
+                    const bounds = this.visualizer.simulationModel.getChunkBounds(chunkCoords.x, chunkCoords.y, chunkX, chunkY, sizeX, sizeY);
                     this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY, 'rgba(255, 255, 255, 0.4)', '#fff');
                 }
 
                 this.drawTouchedChunksOutline(data, params, sizeX, sizeY, cellSize, offsetX, offsetY);
 
                 if (effectiveChunk && !effectiveCell) {
-                    const bounds = this.visualizer.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
+                    const bounds = this.visualizer.simulationModel.getChunkBounds(effectiveChunk.x, effectiveChunk.y, chunkX, chunkY, sizeX, sizeY);
                     this.drawRectHighlight(bounds.startX, bounds.startY, bounds.endX, bounds.endY, cellSize, offsetX, offsetY);
                 }
             }
@@ -2168,7 +2168,7 @@
             getRequestedCellPositions(data, params) {
                 return [...data.requestedCells].map(key => {
                     const [x, y, z] = key.split(',').map(Number);
-                    return this.visualizer.getGlobalPosition(x, y, z, params);
+                    return this.visualizer.simulationModel.getGlobalPosition(x, y, z, params);
                 });
             }
 
@@ -2178,12 +2178,12 @@
                 const effectiveChunk = this.visualizer.getEffectiveChunk();
 
                 if (effectiveChunk) {
-                    const chunkRange = this.visualizer.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
+                    const chunkRange = this.visualizer.simulationModel.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
                     this.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, !effectiveCell);
                 }
 
                 if (effectiveCell) {
-                    const pos = this.visualizer.getGlobalPosition(effectiveCell.x, effectiveCell.y, 0, params);
+                    const pos = this.visualizer.simulationModel.getGlobalPosition(effectiveCell.x, effectiveCell.y, 0, params);
                     this.ctx.strokeStyle = '#fff';
                     this.ctx.lineWidth = 3;
                     this.ctx.strokeRect(offsetX + pos * cellWidth, offsetY, cellWidth, barHeight);
@@ -2198,7 +2198,7 @@
                 const { cellWidth, barHeight, offsetX, offsetY } = this.coordinateService.getLinearBarLayout(this.canvas, data.totalCells);
                 const [sizeX, sizeY, sizeZ] = params.size;
 
-                const spatialChunkColorMap = this.visualizer.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
+                const spatialChunkColorMap = this.visualizer.simulationModel.getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ);
 
                 this.drawLinearChunks(params, data, spatialChunkColorMap,
                                     cellWidth, barHeight, offsetX, offsetY, sizeX, sizeY, sizeZ);
@@ -2227,7 +2227,7 @@
                             const colorIndex = spatialChunkColorMap.get(chunkKey);
 
                             if (colorIndex !== undefined) {
-                                const chunkRange = this.visualizer.getChunkGlobalRange(cx, cy, params);
+                                const chunkRange = this.visualizer.simulationModel.getChunkGlobalRange(cx, cy, params);
                                 if (chunkRange && chunkRange.positions.length > 0) {
                                     chunkRanges.set(chunkKey, {
                                         range: chunkRange,
@@ -2257,7 +2257,7 @@
                 data.touchedChunks.forEach(chunkIdx => {
                     const chunkCY = Math.floor(chunkIdx / chunksX);
                     const chunkCX = chunkIdx % chunksX;
-                    const chunkRange = this.visualizer.getChunkGlobalRange(chunkCX, chunkCY, params);
+                    const chunkRange = this.visualizer.simulationModel.getChunkGlobalRange(chunkCX, chunkCY, params);
 
                     if (chunkRange && chunkRange.positions.length > 0) {
                         allPositions.push(...chunkRange.positions);
@@ -2272,7 +2272,7 @@
                 const effectiveChunk = this.visualizer.getEffectiveChunk();
 
                 if (effectiveChunk) {
-                    const chunkRange = this.visualizer.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
+                    const chunkRange = this.visualizer.simulationModel.getChunkGlobalRange(effectiveChunk.x, effectiveChunk.y, params);
                     const showOutline = true;
                     this.drawLinearChunkHighlight(chunkRange, cellWidth, barHeight, offsetX, offsetY, showOutline);
                 }
@@ -2404,7 +2404,7 @@
                 const params = this.visualizer.getParameters();
                 const [sizeX, sizeY] = params.size;
                 const [chunkX, chunkY] = params.chunk;
-                const foundCell = this.visualizer.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
+                const foundCell = this.visualizer.simulationModel.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
 
                 if (!foundCell) return null;
 
@@ -2887,204 +2887,14 @@
             }
         }
 
-        class DataVisualizer {
+        class SimulationModel {
             constructor() {
-                // Initialize coordinate service and settings manager
-                this.coordinateService = new CoordinateService();
-                this.settingsManager = new SettingsManager();
-
-                this.selectionState = new SelectionState();
-
                 // Initialize caches with LRU policy
                 this.linearizationCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
                 this.positionCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
                 this.chunkPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
                 this.cellPositionCache = new LRUCache(CONFIG.LRU_CONFIG_CACHE_SIZE);
-                this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
-
-                // Initialize coordinate system cache
                 this.cellCoordinateCache = new Map();
-
-                // Initialize canvas manager
-                this.canvasManager = new CanvasManager(this);
-
-                this.initializeControls();
-                this.canvasManager.initializeCanvases();
-                this.updateUI();
-                this.update();
-            }
-
-
-            getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY) {
-                for (let cy = 0; cy < sizeY; cy++) {
-                    for (let cx = 0; cx < sizeX; cx++) {
-                        const globalPos = this.getGlobalPosition(cx, cy, 0, params);
-                        if (globalPos === cellIndex) {
-                            return {
-                                x: cx,
-                                y: cy,
-                                chunkX: Math.floor(cx / chunkX),
-                                chunkY: Math.floor(cy / chunkY)
-                            };
-                        }
-                    }
-                }
-                return null;
-            }
-
-            setState(newState) {
-                const { oldState, hasStructuralChanges } = this.settingsManager.setState(newState);
-
-                // Caches are now managed by LRU policy.
-                // Clearing them on every structural change would prevent the performance benefit
-                // of switching back and forth between recent settings.
-                // if (hasStructuralChanges) {
-                //     this.clearCaches();
-                // }
-            }
-
-            // Full UI update cycle - call this after setState() when you want to update the display
-            updateUI() {
-                this.settingsManager.renderUI();
-                this.settingsManager.updateDOMConstraints();
-                this.updateResetButton();
-                this.updatePresetDisplay();
-                this.update();
-            }
-
-            // Clear all caches when structural changes occur
-            clearCaches() {
-                this.linearizationCache.clear();
-                this.positionCache.clear();
-                if (this.chunkPositionCache) this.chunkPositionCache.clear();
-                if (this.cellPositionCache) this.cellPositionCache.clear();
-                if (this.colorCache) this.colorCache.clear();
-                if (this.coordinateService) this.coordinateService.clearCache();
-            }
-
-            populatePresetOptions() {
-                const presetsSelect = document.getElementById('presets');
-
-                // Add preset options dynamically
-                Object.keys(PRESET_CONFIGS).forEach(presetKey => {
-                    const option = document.createElement('option');
-                    option.value = presetKey;
-                    option.textContent = this.settingsManager.getPresetDisplayName(presetKey, true);
-                    presetsSelect.appendChild(option);
-                });
-            }
-
-            initializeControls() {
-                // Populate preset options
-                this.populatePresetOptions();
-
-                const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ',
-                                 'chunkX', 'chunkY', 'chunkZ',
-                                 'queryX1', 'queryX2', 'queryY1', 'queryY2',
-                                 'queryZ1', 'queryZ2'];
-
-                controls.forEach(id => {
-                    const element = document.getElementById(id);
-                    element.addEventListener('change', (e) => {
-                        let value = e.target.type === 'number' ?
-                            parseInt(e.target.value) :
-                            e.target.value;
-
-                        // Validate numeric inputs
-                        if (e.target.type === 'number') {
-                            if (isNaN(value)) {
-                                console.warn(`Invalid input value: ${e.target.value}, resetting to 1`);
-                                value = 1;
-                            } else {
-                                // Apply proper constraints based on field type
-                                if (id.startsWith('size') || id.startsWith('chunk')) {
-                                    value = Math.max(1, value); // Dimensions and chunk sizes must be >= 1
-                                } else {
-                                    value = Math.max(0, value); // Query ranges can start at 0
-                                }
-
-                                // Apply upper limits
-                                if (id.startsWith('size')) value = Math.min(value, 64); // Cap array sizes
-                                if (id === 'sizeZ') value = Math.min(value, 16); // Cap Z dimension
-                            }
-                        }
-
-                        this.setState({ [id]: value });
-                        this.updateUI();
-                        this.settingsManager.saveSettings(); // Explicit save for user input
-                    });
-                });
-
-                // Add preset handler
-                document.getElementById('presets').addEventListener('change', (e) => {
-                    this.settingsManager.loadPreset(e.target.value);
-                    this.updateUI();
-                    this.settingsManager.saveSettings(); // Save when user explicitly changes preset
-                });
-
-                // Add reset button handler
-                document.getElementById('resetButton').addEventListener('click', () => {
-                    this.settingsManager.resetCurrentPreset();
-                    this.updateUI();
-                    this.settingsManager.saveSettings();
-                });
-
-                this.updateConstraints();
-                this.updateResetButton();
-            }
-
-            updateResetButton() {
-                const resetButton = document.getElementById('resetButton');
-                const shouldShow = this.settingsManager.shouldShowResetButton();
-
-                resetButton.disabled = !shouldShow;
-                resetButton.style.opacity = shouldShow ? '1' : '0.5';
-            }
-
-            updatePresetDisplay() {
-                const presetsSelect = document.getElementById('presets');
-
-                // Update all preset option text to show/hide asterisks
-                presetsSelect.querySelectorAll('option').forEach(option => {
-                    option.textContent = this.settingsManager.getPresetDisplayName(option.value, true);
-                });
-            }
-
-            updateConstraints() {
-                // Validate and clamp state values using settings manager
-                const updates = this.settingsManager.validateAndClampState();
-
-                // Update DOM constraints
-                this.settingsManager.updateDOMConstraints();
-
-                // Apply any needed state updates
-                if (Object.keys(updates).length > 0) {
-                    this.setState(updates);
-                    this.settingsManager.renderUI(); // Only update form values, don't trigger full UI cycle
-                }
-            }
-
-            getParameters() {
-                const state = this.settingsManager.state;
-                return {
-                    cellAlgorithm: state.cellAlgorithm,
-                    chunkAlgorithm: state.chunkAlgorithm,
-                    size: [
-                        state.sizeX,
-                        state.sizeY,
-                        state.sizeZ
-                    ],
-                    chunk: [
-                        state.chunkX,
-                        state.chunkY,
-                        state.chunkZ
-                    ],
-                    query: {
-                        x: [state.queryX1, state.queryX2],
-                        y: [state.queryY1, state.queryY2],
-                        z: [state.queryZ1, state.queryZ2]
-                    }
-                };
             }
 
             // Create or get cached CellCoordinate system for given params
@@ -3093,23 +2903,16 @@
                 const [chunkX, chunkY, chunkZ = 1] = params.chunk;
                 const { cellAlgorithm = 'row-major', chunkAlgorithm = 'row-major' } = params;
 
-                // Create cache key for this configuration
                 const cacheKey = JSON.stringify([sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, cellAlgorithm, chunkAlgorithm]);
-
-                // Check if we have a cached system for this configuration
                 if (this.cellCoordinateCache.has(cacheKey)) {
                     return this.cellCoordinateCache.get(cacheKey);
                 }
 
-                // Calculate number of chunks in each dimension
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
                 const chunksZ = Math.ceil(sizeZ / chunkZ);
 
-                // Create chunk grid coordinate system (represents the chunk layout, not individual chunk contents)
                 const chunkGrid = new GridCoordinate(chunksX, chunksY, chunksZ, chunkAlgorithm, this.chunkPositionCache);
-
-                // Create cell coordinate system
                 const cellCoordinate = new CellCoordinate(
                     sizeX, sizeY, sizeZ,
                     cellAlgorithm,
@@ -3118,14 +2921,11 @@
                     this.linearizationCache
                 );
 
-                // Cache and return
                 this.cellCoordinateCache.set(cacheKey, cellCoordinate);
                 return cellCoordinate;
             }
 
-            // Updated delegate methods using CellCoordinate
             linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-                // Create a temporary grid for standalone linearization
                 const tempGrid = new GridCoordinate(sizeX, sizeY, sizeZ, algorithm, this.linearizationCache);
                 return tempGrid.linearize(x, y, z);
             }
@@ -3133,26 +2933,18 @@
             getIntraChunkPosition(x, y, z, params) {
                 const [sizeX, sizeY, sizeZ = 1] = params.size;
                 const [chunkX, chunkY, chunkZ = 1] = params.chunk;
-
-                // Calculate which chunk this cell belongs to
                 const chunkCX = Math.floor(x / chunkX);
                 const chunkCY = Math.floor(y / chunkY);
                 const chunkCZ = Math.floor(z / chunkZ);
-
-                // Calculate actual chunk bounds (this is the key fix)
                 const chunkStartX = chunkCX * chunkX;
                 const chunkStartY = chunkCY * chunkY;
                 const chunkStartZ = chunkCZ * chunkZ;
                 const actualChunkX = Math.min(chunkStartX + chunkX, sizeX) - chunkStartX;
                 const actualChunkY = Math.min(chunkStartY + chunkY, sizeY) - chunkStartY;
                 const actualChunkZ = Math.min(chunkStartZ + chunkZ, sizeZ) - chunkStartZ;
-
-                // Calculate local coordinates within this chunk
                 const localX = x - chunkStartX;
                 const localY = y - chunkStartY;
                 const localZ = z - chunkStartZ;
-
-                // Use the original linearization logic with actual chunk dimensions
                 return this.linearizeCoordinate(localX, localY, localZ, actualChunkX, actualChunkY, actualChunkZ, params.cellAlgorithm);
             }
 
@@ -3163,7 +2955,6 @@
             }
 
             getNormalizedChunkPosition(x, y, z, params) {
-                // This method seems to be used for cache compatibility - for now delegate to getInterChunkPosition
                 return this.getInterChunkPosition(x, y, z, params);
             }
 
@@ -3172,9 +2963,7 @@
                 return cellCoord.getGlobalIndex(x, y, z);
             }
 
-            // Helper method for renderers to get chunk bounds using new coordinate system
             getChunkBounds(chunkCX, chunkCY, chunkX, chunkY, sizeX, sizeY) {
-                // Calculate chunk bounds directly - this is simple math, no need for complex coordinate system
                 const startX = chunkCX * chunkX;
                 const startY = chunkCY * chunkY;
                 const endX = Math.min(startX + chunkX, sizeX);
@@ -3182,12 +2971,9 @@
                 return { startX, startY, endX, endY };
             }
 
-            // Get the range of global positions for a chunk
             getChunkGlobalRange(chunkCX, chunkCY, params) {
                 const [sizeX, sizeY] = params.size;
                 const [chunkX, chunkY] = params.chunk;
-                const cellsPerChunk = chunkX * chunkY;
-
                 const positions = [];
                 for (let dy = 0; dy < chunkY; dy++) {
                     for (let dx = 0; dx < chunkX; dx++) {
@@ -3198,7 +2984,6 @@
                         }
                     }
                 }
-
                 if (positions.length === 0) return null;
                 return {
                     min: Math.min(...positions),
@@ -3206,7 +2991,6 @@
                     positions: positions
                 };
             }
-
 
             getChunkIndex(x, y, z, params) {
                 const [chunkX, chunkY, chunkZ] = params.chunk;
@@ -3219,79 +3003,19 @@
                 return cx + cy * chunksX + cz * chunksX * chunksY;
             }
 
-            getColorForLinearPosition(position, maxPosition) {
-                const key = `${position}-${maxPosition}`;
-
-                const cachedColor = this.colorCache.get(key);
-                if (cachedColor) {
-                    return cachedColor;
-                }
-
-                const hue = 120 - (position / maxPosition) * 120; // Green to red (120° to 0°)
-                const color = `hsl(${hue}, 70%, 50%)`;
-
-                this.colorCache.set(key, color);
-                return color;
-            }
-
-            // Helper methods to get the effective cell/chunk for highlighting (selected takes precedence over hovered)
-            getEffectiveCell() {
-                return this.selectionState.getEffectiveCell();
-            }
-
-            getEffectiveChunk() {
-                return this.selectionState.getEffectiveChunk();
-            }
-
-
-
-            update() {
-                const params = this.getParameters();
-
-                // Update Z range visibility
-                document.getElementById('zRange').style.display =
-                    params.size[2] > 0 ? 'flex' : 'none';
-
-                // Calculate data
-                const data = this.calculateData(params);
-                this.currentData = data; // Store for mouse interactions
-
-                // Draw all views using canvas manager
-                this.canvasManager.renderAll(params, data);
-
-                // Update metrics
-                this.updateMetrics(data);
-            }
-
             calculateData(params) {
                 const [sizeX, sizeY, sizeZ] = params.size;
                 const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
-
                 const { requestedCells, touchedChunks } = this.calculateRequestedCellsAndChunks(params, sizeX, sizeY, sizeZ);
                 const actualCells = this.calculateActualCellsFromChunks(touchedChunks, params, sizeX, sizeY, sizeZ);
-
-                const chunkedRanges = this.calculateByteRanges(
-                    this.cellSetToPositions(actualCells, params)
-                );
-
-                const unchunkedRanges = this.calculateByteRanges(
-                    this.cellSetToPositions(requestedCells, params)
-                );
-
-                return {
-                    requestedCells,
-                    actualCells,
-                    touchedChunks,
-                    chunkedRanges,
-                    unchunkedRanges,
-                    totalCells
-                };
+                const chunkedRanges = this.calculateByteRanges(this.cellSetToPositions(actualCells, params));
+                const unchunkedRanges = this.calculateByteRanges(this.cellSetToPositions(requestedCells, params));
+                return { requestedCells, actualCells, touchedChunks, chunkedRanges, unchunkedRanges, totalCells };
             }
 
             calculateRequestedCellsAndChunks(params, sizeX, sizeY, sizeZ) {
                 const requestedCells = new Set();
                 const touchedChunks = new Set();
-
                 for (let x = params.query.x[0]; x <= Math.min(params.query.x[1], sizeX - 1); x++) {
                     for (let y = params.query.y[0]; y <= Math.min(params.query.y[1], sizeY - 1); y++) {
                         if (sizeZ > 0) {
@@ -3305,7 +3029,6 @@
                         }
                     }
                 }
-
                 return { requestedCells, touchedChunks };
             }
 
@@ -3314,12 +3037,10 @@
                 const [chunkX, chunkY, chunkZ] = params.chunk;
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
-
                 touchedChunks.forEach(chunkIdx => {
                     const chunkCoords = this.getChunkCoordsFromIndex(chunkIdx, chunksX, chunksY);
                     this.addChunkCells(actualCells, chunkCoords, params, sizeX, sizeY, sizeZ);
                 });
-
                 return actualCells;
             }
 
@@ -3333,14 +3054,12 @@
             addChunkCells(actualCells, chunkCoords, params, sizeX, sizeY, sizeZ) {
                 const [chunkX, chunkY, chunkZ] = params.chunk;
                 const { cx, cy, cz } = chunkCoords;
-
                 for (let dx = 0; dx < chunkX; dx++) {
                     for (let dy = 0; dy < chunkY; dy++) {
                         for (let dz = 0; dz < (sizeZ > 0 ? chunkZ : 1); dz++) {
                             const x = cx * chunkX + dx;
                             const y = cy * chunkY + dy;
                             const z = cz * chunkZ + dz;
-
                             if (x < sizeX && y < sizeY && (sizeZ === 0 || z < sizeZ)) {
                                 actualCells.add(`${x},${y},${z}`);
                             }
@@ -3358,12 +3077,10 @@
 
             calculateByteRanges(positions) {
                 if (positions.length === 0) return [];
-
                 const sorted = [...positions].sort((a, b) => a - b);
                 const ranges = [];
                 let start = sorted[0];
                 let end = sorted[0];
-
                 for (let i = 1; i < sorted.length; i++) {
                     if (sorted[i] === end + 1) {
                         end = sorted[i];
@@ -3376,14 +3093,12 @@
                 return ranges;
             }
 
-
             getOrCreateChunkColorMap(params, sizeX, sizeY, sizeZ) {
                 const [chunkX, chunkY] = params.chunk;
                 const chunksX = Math.ceil(sizeX / chunkX);
                 const chunksY = Math.ceil(sizeY / chunkY);
                 const chunksZ = Math.ceil(Math.max(1, sizeZ) / Math.max(1, params.chunk[2]));
                 const cacheKey = JSON.stringify([chunksX, chunksY, chunksZ, params.chunkAlgorithm]);
-
                 let chunkColorMap = this.positionCache.get(cacheKey);
                 if (!chunkColorMap) {
                     chunkColorMap = this.createChunkColorMap(params, chunksX, chunksY, chunksZ);
@@ -3402,9 +3117,7 @@
                         }
                     }
                 }
-
                 chunkPositions.sort((a, b) => a.linearPos - b.linearPos);
-
                 const chunkColorMap = new Map();
                 chunkPositions.forEach((chunk, index) => {
                     const key = `${chunk.chunkCX},${chunk.chunkCY},${chunk.chunkCZ}`;
@@ -3413,11 +3126,9 @@
                 return chunkColorMap;
             }
 
-
             getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ) {
                 const [chunkSizeX, chunkSizeY] = params.chunk;
                 const cacheKey = JSON.stringify([sizeX, sizeY, params.cellAlgorithm, params.chunkAlgorithm, chunkSizeX, chunkSizeY]);
-
                 let positionToCell = this.positionCache.get(cacheKey);
                 if (!positionToCell) {
                     positionToCell = new Map();
@@ -3434,26 +3145,192 @@
                 return positionToCell;
             }
 
+            getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY) {
+                for (let cy = 0; cy < sizeY; cy++) {
+                    for (let cx = 0; cx < sizeX; cx++) {
+                        const globalPos = this.getGlobalPosition(cx, cy, 0, params);
+                        if (globalPos === cellIndex) {
+                            return {
+                                x: cx,
+                                y: cy,
+                                chunkX: Math.floor(cx / chunkX),
+                                chunkY: Math.floor(cy / chunkY)
+                            };
+                        }
+                    }
+                }
+                return null;
+            }
+        }
+
+        class DataVisualizer {
+            constructor() {
+                this.simulationModel = new SimulationModel();
+                this.coordinateService = new CoordinateService();
+                this.settingsManager = new SettingsManager();
+                this.selectionState = new SelectionState();
+                this.colorCache = new LRUCache(CONFIG.LRU_DETAIL_CACHE_SIZE);
+                this.canvasManager = new CanvasManager(this);
+
+                this.initializeControls();
+                this.canvasManager.initializeCanvases();
+                this.updateUI();
+                this.update();
+            }
+
+
+            setState(newState) {
+                const { oldState, hasStructuralChanges } = this.settingsManager.setState(newState);
+            }
+
+            updateUI() {
+                this.settingsManager.renderUI();
+                this.settingsManager.updateDOMConstraints();
+                this.updateResetButton();
+                this.updatePresetDisplay();
+                this.update();
+            }
+
+            clearCaches() {
+                this.colorCache.clear();
+                if (this.coordinateService) this.coordinateService.clearCache();
+                // simulationModel caches are not cleared here, they have their own lifecycle
+            }
+
+            populatePresetOptions() {
+                const presetsSelect = document.getElementById('presets');
+                Object.keys(PRESET_CONFIGS).forEach(presetKey => {
+                    const option = document.createElement('option');
+                    option.value = presetKey;
+                    option.textContent = this.settingsManager.getPresetDisplayName(presetKey, true);
+                    presetsSelect.appendChild(option);
+                });
+            }
+
+            initializeControls() {
+                this.populatePresetOptions();
+                const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ', 'queryX1', 'queryX2', 'queryY1', 'queryY2', 'queryZ1', 'queryZ2'];
+                controls.forEach(id => {
+                    const element = document.getElementById(id);
+                    element.addEventListener('change', (e) => {
+                        let value = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value;
+                        if (e.target.type === 'number') {
+                            if (isNaN(value)) {
+                                console.warn(`Invalid input value: ${e.target.value}, resetting to 1`);
+                                value = 1;
+                            } else {
+                                if (id.startsWith('size') || id.startsWith('chunk')) {
+                                    value = Math.max(1, value);
+                                } else {
+                                    value = Math.max(0, value);
+                                }
+                                if (id.startsWith('size')) value = Math.min(value, 64);
+                                if (id === 'sizeZ') value = Math.min(value, 16);
+                            }
+                        }
+                        this.setState({ [id]: value });
+                        this.updateUI();
+                        this.settingsManager.saveSettings();
+                    });
+                });
+
+                document.getElementById('presets').addEventListener('change', (e) => {
+                    this.settingsManager.loadPreset(e.target.value);
+                    this.updateUI();
+                    this.settingsManager.saveSettings();
+                });
+
+                document.getElementById('resetButton').addEventListener('click', () => {
+                    this.settingsManager.resetCurrentPreset();
+                    this.updateUI();
+                    this.settingsManager.saveSettings();
+                });
+
+                this.updateConstraints();
+                this.updateResetButton();
+            }
+
+            updateResetButton() {
+                const resetButton = document.getElementById('resetButton');
+                const shouldShow = this.settingsManager.shouldShowResetButton();
+                resetButton.disabled = !shouldShow;
+                resetButton.style.opacity = shouldShow ? '1' : '0.5';
+            }
+
+            updatePresetDisplay() {
+                const presetsSelect = document.getElementById('presets');
+                presetsSelect.querySelectorAll('option').forEach(option => {
+                    option.textContent = this.settingsManager.getPresetDisplayName(option.value, true);
+                });
+            }
+
+            updateConstraints() {
+                const updates = this.settingsManager.validateAndClampState();
+                this.settingsManager.updateDOMConstraints();
+                if (Object.keys(updates).length > 0) {
+                    this.setState(updates);
+                    this.settingsManager.renderUI();
+                }
+            }
+
+            getParameters() {
+                const state = this.settingsManager.state;
+                return {
+                    cellAlgorithm: state.cellAlgorithm,
+                    chunkAlgorithm: state.chunkAlgorithm,
+                    size: [state.sizeX, state.sizeY, state.sizeZ],
+                    chunk: [state.chunkX, state.chunkY, state.chunkZ],
+                    query: {
+                        x: [state.queryX1, state.queryX2],
+                        y: [state.queryY1, state.queryY2],
+                        z: [state.queryZ1, state.queryZ2]
+                    }
+                };
+            }
+
+            getColorForLinearPosition(position, maxPosition) {
+                const key = `${position}-${maxPosition}`;
+                const cachedColor = this.colorCache.get(key);
+                if (cachedColor) return cachedColor;
+                const hue = 120 - (position / maxPosition) * 120;
+                const color = `hsl(${hue}, 70%, 50%)`;
+                this.colorCache.set(key, color);
+                return color;
+            }
+
+            getEffectiveCell() {
+                return this.selectionState.getEffectiveCell();
+            }
+
+            getEffectiveChunk() {
+                return this.selectionState.getEffectiveChunk();
+            }
+
+            update() {
+                const params = this.getParameters();
+                document.getElementById('zRange').style.display = params.size[2] > 0 ? 'flex' : 'none';
+                const data = this.simulationModel.calculateData(params);
+                this.currentData = data;
+                this.canvasManager.renderAll(params, data);
+                this.updateMetrics(data);
+            }
+
             updateMetrics(data) {
                 const params = this.getParameters();
-                const [sizeX, sizeY] = params.size;
-                const queryWidth = Math.abs(params.query.x[1] - params.query.x[0]) + 1;
-                const queryHeight = Math.abs(params.query.y[1] - params.query.y[0]) + 1;
                 const amplification = data.actualCells.size / Math.max(1, data.requestedCells.size);
                 const coalescingFactor = data.touchedChunks.size / Math.max(1, data.chunkedRanges.length);
-                const coalscingScore = 1 - ((data.chunkedRanges.length - 1) / Math.max(1, (data.touchedChunks.size - 1)))
-                const storageAlignment = 2 / (amplification + (1 / coalscingScore));
+                const amplificationScore = 1 / Math.max(1, amplification);
+                const rangeScore = 1 / Math.max(1, data.chunkedRanges.length);
+                const storageAlignment =
+                    (.9 * amplificationScore) + (.1 * rangeScore);
 
                 document.getElementById('requested-cells').textContent = data.requestedCells.size;
                 document.getElementById('actual-cells').textContent = data.actualCells.size;
-                document.getElementById('amplification').innerHTML =
-                    amplification.toFixed(2) + '<span class="metric-suffix">x</span>';
+                document.getElementById('amplification').innerHTML = amplification.toFixed(2) + '<span class="metric-suffix">x</span>';
                 document.getElementById('chunks-touched').textContent = data.touchedChunks.size;
                 document.getElementById('byte-ranges').textContent = data.chunkedRanges.length;
-                document.getElementById('efficiency').innerHTML =
-                    (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
-                document.getElementById('coalescing-factor').innerHTML =
-                    coalescingFactor.toFixed(1) + '<span class="metric-suffix">x</span>';
+                document.getElementById('efficiency').innerHTML = (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
+                document.getElementById('coalescing-factor').innerHTML = coalescingFactor.toFixed(1) + '<span class="metric-suffix">x</span>';
                 document.getElementById('storage-alignment').textContent = storageAlignment.toFixed(2);
             }
         }
