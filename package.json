@@ -1,0 +1,29 @@
+{
+  "name": "vischunk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "An interactive web-based tool for exploring how different chunking and linearization strategies affect data access patterns in multidimensional arrays. This visualization helps understand the trade-offs between different storage layouts and their impact on read performance.",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "parcel src/index.html",
+    "build": "parcel build src/index.html",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jkeifer/vischunk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jkeifer/vischunk/issues"
+  },
+  "homepage": "https://github.com/jkeifer/vischunk#readme",
+  "devDependencies": {
+    "jest": "^30.1.3",
+    "parcel": "^2.15.4"
+  }
+}
