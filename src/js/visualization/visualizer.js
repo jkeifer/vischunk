@@ -1,10 +1,10 @@
-import { SimulationModel } from '/src/js/models/simulation.js';
-import { SettingsManager } from '/src/js/models/settings.js';
-import { SelectionState } from '/src/js/models/selection.js';
-import { CoordinateService } from '/src/js/services/coordinate.js';
-import { CanvasManager } from '/src/js/visualization/canvas-manager.js';
-import { LRUCache } from '/src/js/core/cache.js';
-import { CONFIG, PRESET_CONFIGS } from '/src/js/core/constants.js';
+import { SimulationModel } from '../models/simulation.js';
+import { SettingsManager } from '../models/settings.js';
+import { SelectionState } from '../models/selection.js';
+import { CoordinateService } from '../services/coordinate.js';
+import { CanvasManager } from './canvas-manager.js';
+import { LRUCache } from '../core/cache.js';
+import { CONFIG, PRESET_CONFIGS } from '../core/constants.js';
 
 export class DataVisualizer {
     constructor() {

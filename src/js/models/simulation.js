@@ -1,6 +1,6 @@
-import { LRUCache } from '/src/js/core/cache.js';
-import { CONFIG } from '/src/js/core/constants.js';
-import { GridCoordinate, CellCoordinate } from '/src/js/core/coordinates.js';
+import { LRUCache } from '../core/cache.js';
+import { CONFIG } from '../core/constants.js';
+import { GridCoordinate, CellCoordinate } from '../core/coordinates.js';
 
 export class SimulationModel {
     constructor() {

@@ -1,4 +1,4 @@
-import { CONFIG } from '/src/js/core/constants.js';
+import { CONFIG } from '../core/constants.js';
 
 export class BaseCanvasRenderer {
     constructor(canvas, context, visualizer, coordinateService) {

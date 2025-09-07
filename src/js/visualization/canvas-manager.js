@@ -1,12 +1,12 @@
-import { TooltipManager } from '/src/js/models/selection.js';
+import { TooltipManager } from '../models/selection.js';
 import {
     SpatialUnchunkedRenderer,
     SpatialChunkedRenderer,
     LinearUnchunkedRenderer,
     LinearChunkedRenderer,
-} from '/src/js/visualization/renderers.js';
-import { InteractionManager } from '/src/js/visualization/interaction.js';
-import { CONFIG } from '/src/js/core/constants.js';
+} from './renderers.js';
+import { InteractionManager } from './interaction.js';
+import { CONFIG } from '../core/constants.js';
 
 export class CanvasManager {
     constructor(visualizer) {

@@ -1,4 +1,4 @@
-import { TooltipContentGenerator } from '/src/js/models/selection.js';
+import { TooltipContentGenerator } from '../models/selection.js';
 
 export class InteractionStrategy {
     constructor(visualizer, tooltipManager) {
