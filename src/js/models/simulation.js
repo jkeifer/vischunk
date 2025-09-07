@@ -18,7 +18,16 @@ export class SimulationModel {
         const [chunkX, chunkY, chunkZ = 1] = params.chunk;
         const { cellAlgorithm = 'row-major', chunkAlgorithm = 'row-major' } = params;
 
-        const cacheKey = JSON.stringify([sizeX, sizeY, sizeZ, chunkX, chunkY, chunkZ, cellAlgorithm, chunkAlgorithm]);
+        const cacheKey = JSON.stringify([
+            sizeX,
+            sizeY,
+            sizeZ,
+            chunkX,
+            chunkY,
+            chunkZ,
+            cellAlgorithm,
+            chunkAlgorithm,
+        ]);
         if (this.cellCoordinateCache.has(cacheKey)) {
             return this.cellCoordinateCache.get(cacheKey);
         }
@@ -27,12 +36,22 @@ export class SimulationModel {
         const chunksY = Math.ceil(sizeY / chunkY);
         const chunksZ = Math.ceil(sizeZ / chunkZ);
 
-        const chunkGrid = new GridCoordinate(chunksX, chunksY, chunksZ, chunkAlgorithm, this.chunkPositionCache);
+        const chunkGrid = new GridCoordinate(
+            chunksX,
+            chunksY,
+            chunksZ,
+            chunkAlgorithm,
+            this.chunkPositionCache
+        );
         const cellCoordinate = new CellCoordinate(
-            sizeX, sizeY, sizeZ,
+            sizeX,
+            sizeY,
+            sizeZ,
             cellAlgorithm,
             chunkGrid,
-            chunkX, chunkY, chunkZ,
+            chunkX,
+            chunkY,
+            chunkZ,
             this.linearizationCache
         );
 
@@ -41,7 +60,13 @@ export class SimulationModel {
     }
 
     linearizeCoordinate(x, y, z, sizeX, sizeY, sizeZ, algorithm) {
-        const tempGrid = new GridCoordinate(sizeX, sizeY, sizeZ, algorithm, this.linearizationCache);
+        const tempGrid = new GridCoordinate(
+            sizeX,
+            sizeY,
+            sizeZ,
+            algorithm,
+            this.linearizationCache
+        );
         return tempGrid.linearize(x, y, z);
     }
 
@@ -60,7 +85,15 @@ export class SimulationModel {
         const localX = x - chunkStartX;
         const localY = y - chunkStartY;
         const localZ = z - chunkStartZ;
-        return this.linearizeCoordinate(localX, localY, localZ, actualChunkX, actualChunkY, actualChunkZ, params.cellAlgorithm);
+        return this.linearizeCoordinate(
+            localX,
+            localY,
+            localZ,
+            actualChunkX,
+            actualChunkY,
+            actualChunkZ,
+            params.cellAlgorithm
+        );
     }
 
     getInterChunkPosition(x, y, z, params) {
@@ -99,11 +132,13 @@ export class SimulationModel {
                 }
             }
         }
-        if (positions.length === 0) return null;
+        if (positions.length === 0) {
+            return null;
+        }
         return {
             min: Math.min(...positions),
             max: Math.max(...positions),
-            positions: positions
+            positions: positions,
         };
     }
 
@@ -121,11 +156,33 @@ export class SimulationModel {
     calculateData(params) {
         const [sizeX, sizeY, sizeZ] = params.size;
         const totalCells = sizeX * sizeY * Math.max(1, sizeZ);
-        const { requestedCells, touchedChunks } = this.calculateRequestedCellsAndChunks(params, sizeX, sizeY, sizeZ);
-        const actualCells = this.calculateActualCellsFromChunks(touchedChunks, params, sizeX, sizeY, sizeZ);
-        const chunkedRanges = this.calculateByteRanges(this.cellSetToPositions(actualCells, params));
-        const unchunkedRanges = this.calculateByteRanges(this.cellSetToPositions(requestedCells, params));
-        return { requestedCells, actualCells, touchedChunks, chunkedRanges, unchunkedRanges, totalCells };
+        const { requestedCells, touchedChunks } = this.calculateRequestedCellsAndChunks(
+            params,
+            sizeX,
+            sizeY,
+            sizeZ
+        );
+        const actualCells = this.calculateActualCellsFromChunks(
+            touchedChunks,
+            params,
+            sizeX,
+            sizeY,
+            sizeZ
+        );
+        const chunkedRanges = this.calculateByteRanges(
+            this.cellSetToPositions(actualCells, params)
+        );
+        const unchunkedRanges = this.calculateByteRanges(
+            this.cellSetToPositions(requestedCells, params)
+        );
+        return {
+            requestedCells,
+            actualCells,
+            touchedChunks,
+            chunkedRanges,
+            unchunkedRanges,
+            totalCells,
+        };
     }
 
     calculateRequestedCellsAndChunks(params, sizeX, sizeY, sizeZ) {
@@ -134,7 +191,11 @@ export class SimulationModel {
         for (let x = params.query.x[0]; x <= Math.min(params.query.x[1], sizeX - 1); x++) {
             for (let y = params.query.y[0]; y <= Math.min(params.query.y[1], sizeY - 1); y++) {
                 if (sizeZ > 0) {
-                    for (let z = params.query.z[0]; z <= Math.min(params.query.z[1], sizeZ - 1); z++) {
+                    for (
+                        let z = params.query.z[0];
+                        z <= Math.min(params.query.z[1], sizeZ - 1);
+                        z++
+                    ) {
                         requestedCells.add(`${x},${y},${z}`);
                         touchedChunks.add(this.getChunkIndex(x, y, z, params));
                     }
@@ -149,7 +210,7 @@ export class SimulationModel {
 
     calculateActualCellsFromChunks(touchedChunks, params, sizeX, sizeY, sizeZ) {
         const actualCells = new Set();
-        const [chunkX, chunkY, chunkZ] = params.chunk;
+        const [chunkX, chunkY, _chunkZ] = params.chunk;
         const chunksX = Math.ceil(sizeX / chunkX);
         const chunksY = Math.ceil(sizeY / chunkY);
         touchedChunks.forEach(chunkIdx => {
@@ -191,7 +252,9 @@ export class SimulationModel {
     }
 
     calculateByteRanges(positions) {
-        if (positions.length === 0) return [];
+        if (positions.length === 0) {
+            return [];
+        }
         const sorted = [...positions].sort((a, b) => a - b);
         const ranges = [];
         let start = sorted[0];
@@ -227,7 +290,15 @@ export class SimulationModel {
         for (let chunkCZ = 0; chunkCZ < chunksZ; chunkCZ++) {
             for (let chunkCY = 0; chunkCY < chunksY; chunkCY++) {
                 for (let chunkCX = 0; chunkCX < chunksX; chunkCX++) {
-                    const linearPos = this.linearizeCoordinate(chunkCX, chunkCY, chunkCZ, chunksX, chunksY, chunksZ, params.chunkAlgorithm);
+                    const linearPos = this.linearizeCoordinate(
+                        chunkCX,
+                        chunkCY,
+                        chunkCZ,
+                        chunksX,
+                        chunksY,
+                        chunksZ,
+                        params.chunkAlgorithm
+                    );
                     chunkPositions.push({ chunkCX, chunkCY, chunkCZ, linearPos });
                 }
             }
@@ -243,7 +314,14 @@ export class SimulationModel {
 
     getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ) {
         const [chunkSizeX, chunkSizeY] = params.chunk;
-        const cacheKey = JSON.stringify([sizeX, sizeY, params.cellAlgorithm, params.chunkAlgorithm, chunkSizeX, chunkSizeY]);
+        const cacheKey = JSON.stringify([
+            sizeX,
+            sizeY,
+            params.cellAlgorithm,
+            params.chunkAlgorithm,
+            chunkSizeX,
+            chunkSizeY,
+        ]);
         let positionToCell = this.positionCache.get(cacheKey);
         if (!positionToCell) {
             positionToCell = new Map();
@@ -251,7 +329,7 @@ export class SimulationModel {
                 for (let y = 0; y < sizeY; y++) {
                     for (let x = 0; x < sizeX; x++) {
                         const globalPos = this.getGlobalPosition(x, y, z, params);
-                        positionToCell.set(globalPos, {x, y, z});
+                        positionToCell.set(globalPos, { x, y, z });
                     }
                 }
             }
@@ -264,16 +342,16 @@ export class SimulationModel {
         const [, , sizeZ] = params.size;
         const positionToCell = this.getOrCreatePositionToCellMap(params, sizeX, sizeY, sizeZ);
         const cell = positionToCell.get(cellIndex);
-        
+
         if (!cell) {
             return null;
         }
-        
+
         return {
             x: cell.x,
             y: cell.y,
             chunkX: Math.floor(cell.x / chunkX),
-            chunkY: Math.floor(cell.y / chunkY)
+            chunkY: Math.floor(cell.y / chunkY),
         };
     }
 }

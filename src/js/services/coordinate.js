@@ -13,7 +13,7 @@ export class CoordinateService {
         const scaleY = canvas.height / rect.height;
         return {
             x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
+            y: (e.clientY - rect.top) * scaleY,
         };
     }
 
@@ -52,7 +52,7 @@ export class CoordinateService {
             cellX,
             cellY,
             isValid: cellX >= 0 && cellX < sizeX && cellY >= 0 && cellY < sizeY,
-            layout: { cellSize, offsetX, offsetY }
+            layout: { cellSize, offsetX, offsetY },
         };
     }
 
@@ -75,7 +75,10 @@ export class CoordinateService {
     }
 
     getLinearCellCoordinates(canvasX, canvasY, canvas, data) {
-        const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(canvas, data.totalCells);
+        const { cellWidth, barHeight, offsetX, offsetY } = this.getLinearBarLayout(
+            canvas,
+            data.totalCells
+        );
 
         const dpr = window.devicePixelRatio || 1;
         const logicalX = canvasX / dpr;
@@ -88,14 +91,14 @@ export class CoordinateService {
         return {
             cellIndex,
             isValid: isInBar && isValidIndex,
-            layout: { cellWidth, barHeight, offsetX, offsetY }
+            layout: { cellWidth, barHeight, offsetX, offsetY },
         };
     }
 
     getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY) {
         return {
             x: Math.floor(cellX / chunkX),
-            y: Math.floor(cellY / chunkY)
+            y: Math.floor(cellY / chunkY),
         };
     }
 

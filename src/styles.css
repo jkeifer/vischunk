@@ -94,7 +94,11 @@
     --canvas-viewport-cell-size: 8px;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    --gradient-primary: linear-gradient(
+        135deg,
+        rgba(102, 126, 234, 0.1) 0%,
+        rgba(118, 75, 162, 0.1) 100%
+    );
     --gradient-metrics: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --gradient-color-scale: linear-gradient(90deg, #00ff00, #ff0000);
 }
@@ -197,7 +201,6 @@ h2 {
     border: 1px solid var(--border-primary);
 }
 
-
 .section-container h2 {
     color: var(--text-primary);
     font-size: var(--font-size-xl);
@@ -267,7 +270,8 @@ label {
     letter-spacing: 0.5px;
 }
 
-input[type="number"], select {
+input[type='number'],
+select {
     padding: var(--space-md);
     border: 1px solid var(--border-input);
     border-radius: var(--radius-md);
@@ -277,7 +281,8 @@ input[type="number"], select {
     transition: all var(--transition-fast);
 }
 
-input[type="number"]:focus, select:focus {
+input[type='number']:focus,
+select:focus {
     outline: none;
     border-color: var(--border-input-focus);
     background: var(--bg-input-focus);

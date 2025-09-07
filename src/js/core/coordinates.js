@@ -8,7 +8,15 @@ export class GridCoordinate {
     }
 
     linearize(x, y, z = 0) {
-        const cacheKey = JSON.stringify([x, y, z, this.sizeX, this.sizeY, this.sizeZ, this.algorithm]);
+        const cacheKey = JSON.stringify([
+            x,
+            y,
+            z,
+            this.sizeX,
+            this.sizeY,
+            this.sizeZ,
+            this.algorithm,
+        ]);
         if (this.cache && this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
@@ -21,7 +29,7 @@ export class GridCoordinate {
     }
 
     calculateLinearPosition(x, y, z) {
-        switch(this.algorithm) {
+        switch (this.algorithm) {
             case 'row-major':
                 return x + y * this.sizeX + z * this.sizeX * this.sizeY;
             case 'col-major':
@@ -30,7 +38,10 @@ export class GridCoordinate {
                 return this.sizeZ > 1 ? this.mortonEncode3D(x, y, z) : this.mortonEncode2D(x, y);
             case 'hilbert':
                 if (this.sizeZ > 1) {
-                    return z * this.sizeX * this.sizeY + this.hilbertEncode2D(x, y, Math.max(this.sizeX, this.sizeY));
+                    return (
+                        z * this.sizeX * this.sizeY +
+                        this.hilbertEncode2D(x, y, Math.max(this.sizeX, this.sizeY))
+                    );
                 } else {
                     return this.hilbertEncode2D(x, y, Math.max(this.sizeX, this.sizeY));
                 }
@@ -50,11 +61,18 @@ export class GridCoordinate {
     }
 
     getDimensions(gridX, gridY, gridZ = 0, nominalSizeX, nominalSizeY, nominalSizeZ = 1) {
-        const bounds = this.getBounds(gridX, gridY, gridZ, nominalSizeX, nominalSizeY, nominalSizeZ);
+        const bounds = this.getBounds(
+            gridX,
+            gridY,
+            gridZ,
+            nominalSizeX,
+            nominalSizeY,
+            nominalSizeZ
+        );
         return {
             actualX: bounds.endX - bounds.startX,
             actualY: bounds.endY - bounds.startY,
-            actualZ: bounds.endZ - bounds.startZ
+            actualZ: bounds.endZ - bounds.startZ,
         };
     }
 
@@ -73,15 +91,18 @@ export class GridCoordinate {
     mortonEncode3D(x, y, z) {
         let result = 0;
         for (let i = 0; i < 10; i++) {
-            result |= ((x & (1 << i)) << (2 * i)) |
-                      ((y & (1 << i)) << (2 * i + 1)) |
-                      ((z & (1 << i)) << (2 * i + 2));
+            result |=
+                ((x & (1 << i)) << (2 * i)) |
+                ((y & (1 << i)) << (2 * i + 1)) |
+                ((z & (1 << i)) << (2 * i + 2));
         }
         return result;
     }
 
     nextPowerOfTwo(n) {
-        if (n <= 1) return 1;
+        if (n <= 1) {
+            return 1;
+        }
         return Math.pow(2, Math.ceil(Math.log2(n)));
     }
 
@@ -90,8 +111,8 @@ export class GridCoordinate {
 
         let d = 0;
         for (let s = n / 2; s > 0; s /= 2) {
-            let rx = (x & s) > 0 ? 1 : 0;
-            let ry = (y & s) > 0 ? 1 : 0;
+            const rx = (x & s) > 0 ? 1 : 0;
+            const ry = (y & s) > 0 ? 1 : 0;
             d += s * s * ((3 * rx) ^ ry);
             [x, y] = this.hilbertRotate(s, x, y, rx, ry);
         }
@@ -111,7 +132,17 @@ export class GridCoordinate {
 }
 
 export class CellCoordinate extends GridCoordinate {
-    constructor(cellSizeX, cellSizeY, cellSizeZ, cellAlgorithm, chunkGrid, chunkSizeX, chunkSizeY, chunkSizeZ, cache) {
+    constructor(
+        cellSizeX,
+        cellSizeY,
+        cellSizeZ,
+        cellAlgorithm,
+        chunkGrid,
+        chunkSizeX,
+        chunkSizeY,
+        chunkSizeZ,
+        cache
+    ) {
         super(cellSizeX, cellSizeY, cellSizeZ, cellAlgorithm, cache);
         this.chunkGrid = chunkGrid;
         this.chunkSizeX = chunkSizeX;
@@ -123,7 +154,7 @@ export class CellCoordinate extends GridCoordinate {
         return {
             x: Math.floor(cellX / this.chunkSizeX),
             y: Math.floor(cellY / this.chunkSizeY),
-            z: Math.floor(cellZ / this.chunkSizeZ)
+            z: Math.floor(cellZ / this.chunkSizeZ),
         };
     }
 
@@ -167,11 +198,24 @@ export class CellCoordinate extends GridCoordinate {
         const actualChunkZ = chunkEndZ - chunkStartZ;
 
         // Get raw linearization position using actual dimensions
-        const rawPos = this.calculateLinearPosition(localX, localY, localZ, actualChunkX, actualChunkY, actualChunkZ);
+        const rawPos = this.calculateLinearPosition(
+            localX,
+            localY,
+            localZ,
+            actualChunkX,
+            actualChunkY,
+            actualChunkZ
+        );
 
         // For space-filling curves, we need normalization like the original code
         if (this.algorithm === 'z-order' || this.algorithm === 'hilbert') {
-            return this.getNormalizedLocalPosition(rawPos, chunk, actualChunkX, actualChunkY, actualChunkZ);
+            return this.getNormalizedLocalPosition(
+                rawPos,
+                chunk,
+                actualChunkX,
+                actualChunkY,
+                actualChunkZ
+            );
         }
 
         return rawPos;
@@ -179,7 +223,7 @@ export class CellCoordinate extends GridCoordinate {
 
     calculateLinearPosition(x, y, z, sizeX, sizeY, sizeZ) {
         // This replicates the original calculateLinearPosition logic exactly
-        switch(this.algorithm) {
+        switch (this.algorithm) {
             case 'row-major':
                 return x + y * sizeX + z * sizeX * sizeY;
             case 'col-major':
@@ -197,9 +241,17 @@ export class CellCoordinate extends GridCoordinate {
         }
     }
 
-    getNormalizedLocalPosition(rawPos, chunk, actualChunkX, actualChunkY, actualChunkZ) {
+    getNormalizedLocalPosition(rawPos, _chunk, actualChunkX, actualChunkY, actualChunkZ) {
         // Build the position mapping for this specific chunk (like original getNormalizedCellPosition)
-        const cacheKey = JSON.stringify([chunk.x, chunk.y, chunk.z, actualChunkX, actualChunkY, actualChunkZ, this.algorithm]);
+        const cacheKey = JSON.stringify([
+            _chunk.x,
+            _chunk.y,
+            _chunk.z,
+            actualChunkX,
+            actualChunkY,
+            actualChunkZ,
+            this.algorithm,
+        ]);
 
         if (!this.localPositionCache) {
             this.localPositionCache = new Map();
@@ -211,7 +263,14 @@ export class CellCoordinate extends GridCoordinate {
             for (let lz = 0; lz < actualChunkZ; lz++) {
                 for (let ly = 0; ly < actualChunkY; ly++) {
                     for (let lx = 0; lx < actualChunkX; lx++) {
-                        const pos = this.calculateLinearPosition(lx, ly, lz, actualChunkX, actualChunkY, actualChunkZ);
+                        const pos = this.calculateLinearPosition(
+                            lx,
+                            ly,
+                            lz,
+                            actualChunkX,
+                            actualChunkY,
+                            actualChunkZ
+                        );
                         positions.push(pos);
                     }
                 }
@@ -233,7 +292,7 @@ export class CellCoordinate extends GridCoordinate {
         return result;
     }
 
-    getNormalizedChunkIndex(rawChunkIndex, chunk) {
+    getNormalizedChunkIndex(rawChunkIndex, _chunk) {
         // Build the normalization map for the chunk grid (like original code)
         const chunksX = this.chunkGrid.sizeX;
         const chunksY = this.chunkGrid.sizeY;
@@ -270,7 +329,9 @@ export class CellCoordinate extends GridCoordinate {
         const normalizationMap = this.chunkNormalizationCache.get(cacheKey);
         const result = normalizationMap.get(rawChunkIndex);
         if (result === undefined) {
-            throw new Error(`Invalid rawChunkIndex ${rawChunkIndex} not found in normalization map`);
+            throw new Error(
+                `Invalid rawChunkIndex ${rawChunkIndex} not found in normalization map`
+            );
         }
         return result;
     }
@@ -291,7 +352,8 @@ export class CellCoordinate extends GridCoordinate {
             const chunkEndY = Math.min(chunkStartY + this.chunkSizeY, this.sizeY);
             const chunkEndZ = Math.min(chunkStartZ + this.chunkSizeZ, this.sizeZ);
 
-            const actualCellsInChunk = (chunkEndX - chunkStartX) * (chunkEndY - chunkStartY) * (chunkEndZ - chunkStartZ);
+            const actualCellsInChunk =
+                (chunkEndX - chunkStartX) * (chunkEndY - chunkStartY) * (chunkEndZ - chunkStartZ);
             cellsBeforeThisChunk += actualCellsInChunk;
         }
 
@@ -307,7 +369,10 @@ export class CellCoordinate extends GridCoordinate {
         // For space-filling curves, use the reverse map from normalization
         if (this.chunkGrid.algorithm === 'z-order' || this.chunkGrid.algorithm === 'hilbert') {
             const cacheKey = JSON.stringify([chunksX, chunksY, chunksZ, this.chunkGrid.algorithm]);
-            if (this.chunkNormalizationCache && this.chunkNormalizationCache.has(cacheKey + '-reverse')) {
+            if (
+                this.chunkNormalizationCache &&
+                this.chunkNormalizationCache.has(cacheKey + '-reverse')
+            ) {
                 const reverseMap = this.chunkNormalizationCache.get(cacheKey + '-reverse');
                 const result = reverseMap.get(chunkIndex);
                 if (result === undefined) {
@@ -318,32 +383,35 @@ export class CellCoordinate extends GridCoordinate {
         }
 
         // For row-major and col-major, use direct calculation
-        switch(this.chunkGrid.algorithm) {
-            case 'row-major':
+        switch (this.chunkGrid.algorithm) {
+            case 'row-major': {
                 const z_rm = Math.floor(chunkIndex / (chunksX * chunksY));
                 const xyIndex_rm = chunkIndex % (chunksX * chunksY);
                 return {
                     x: xyIndex_rm % chunksX,
                     y: Math.floor(xyIndex_rm / chunksX),
-                    z: z_rm
+                    z: z_rm,
                 };
-            case 'col-major':
+            }
+            case 'col-major': {
                 const z_cm = Math.floor(chunkIndex / (chunksX * chunksY));
                 const xyIndex_cm = chunkIndex % (chunksX * chunksY);
                 return {
                     x: Math.floor(xyIndex_cm / chunksY),
                     y: xyIndex_cm % chunksY,
-                    z: z_cm
+                    z: z_cm,
                 };
-            default:
+            }
+            default: {
                 // Fallback to row-major
                 const z_default = Math.floor(chunkIndex / (chunksX * chunksY));
                 const xyIndex_default = chunkIndex % (chunksX * chunksY);
                 return {
                     x: xyIndex_default % chunksX,
                     y: Math.floor(xyIndex_default / chunksX),
-                    z: z_default
+                    z: z_default,
                 };
+            }
         }
     }
 }
