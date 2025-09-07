@@ -1,0 +1,65 @@
+name: CI
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  ci:
+    name: CI Pipeline
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22, 24]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quality checks and tests
+        run: |
+          echo "🔍 Running linting and formatting checks..."
+          npm run lint
+          npm run format:check
+
+          echo "🧪 Running all tests with coverage..."
+          npm run test:all
+
+          echo "🏗️ Building project..."
+          npm run build
+
+          echo "🔒 Running security audit..."
+          npm audit --audit-level=moderate
+
+          echo "✅ All checks completed successfully"
+
+      - name: Verify build artifacts
+        run: |
+          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+            echo "❌ Build verification failed"
+            exit 1
+          fi
+          echo "✅ Build artifacts verified"
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        if: matrix.node-version == '24'
+        with:
+          file: ./coverage/lcov.info
+          fail_ci_if_error: false
