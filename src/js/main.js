@@ -2,7 +2,7 @@
 import '/src/styles.css';
 
 // Import main application class
-import { DataVisualizer } from '/src/js/visualization/visualizer.js';
+import { DataVisualizer } from './visualization/visualizer.js';
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {

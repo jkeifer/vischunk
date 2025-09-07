@@ -1,5 +1,5 @@
-import { LRUCache } from '/src/js/core/cache.js';
-import { CONFIG } from '/src/js/core/constants.js';
+import { LRUCache } from '../core/cache.js';
+import { CONFIG } from '../core/constants.js';
 
 export class CoordinateService {
     constructor() {
