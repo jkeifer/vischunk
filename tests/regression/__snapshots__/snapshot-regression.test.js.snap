@@ -1,0 +1,545 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Snapshot-Based Regression Tests Algorithm Output Snapshots Basic Row-Major 16x16 produces consistent output 1`] = `
+{
+  "cellSamples": {
+    "actualSample": [
+      "10,10,0",
+      "10,11,0",
+      "10,4,0",
+      "10,5,0",
+      "10,6,0",
+      "10,7,0",
+      "10,8,0",
+      "10,9,0",
+      "11,10,0",
+      "11,11,0",
+    ],
+    "requestedSample": [
+      "4,4,0",
+      "4,5,0",
+      "4,6,0",
+      "4,7,0",
+      "4,8,0",
+      "5,4,0",
+      "5,5,0",
+      "5,6,0",
+      "5,7,0",
+      "5,8,0",
+    ],
+  },
+  "coordinateMappings": {
+    "0,0,0": {
+      "global": 0,
+      "interChunk": 0,
+      "intraChunk": 0,
+    },
+    "0,1,0": {
+      "global": 4,
+      "interChunk": 0,
+      "intraChunk": 4,
+    },
+    "1,0,0": {
+      "global": 1,
+      "interChunk": 0,
+      "intraChunk": 1,
+    },
+    "15,15,0": {
+      "global": 255,
+      "interChunk": 15,
+      "intraChunk": 15,
+    },
+    "4,4,0": {
+      "global": 80,
+      "interChunk": 5,
+      "intraChunk": 0,
+    },
+    "7,7,0": {
+      "global": 95,
+      "interChunk": 5,
+      "intraChunk": 15,
+    },
+    "8,8,0": {
+      "global": 160,
+      "interChunk": 10,
+      "intraChunk": 0,
+    },
+  },
+  "metrics": {
+    "actualCells": 64,
+    "amplification": 2.56,
+    "rangeCount": 2,
+    "requestedCells": 25,
+    "totalCells": 256,
+    "touchedChunks": 4,
+  },
+  "ranges": [
+    {
+      "end": 111,
+      "start": 80,
+    },
+    {
+      "end": 175,
+      "start": 144,
+    },
+  ],
+}
+`;
+
+exports[`Snapshot-Based Regression Tests Algorithm Output Snapshots Column-Major 3D Configuration produces consistent output 1`] = `
+{
+  "cellSamples": {
+    "actualSample": [
+      "0,0,0",
+      "0,0,1",
+      "0,0,2",
+      "0,0,3",
+      "0,1,0",
+      "0,1,1",
+      "0,1,2",
+      "0,1,3",
+      "0,2,0",
+      "0,2,1",
+    ],
+    "requestedSample": [
+      "1,1,1",
+      "1,1,2",
+      "1,2,1",
+      "1,2,2",
+      "2,1,1",
+      "2,1,2",
+      "2,2,1",
+      "2,2,2",
+    ],
+  },
+  "coordinateMappings": {
+    "0,0,0": {
+      "global": 0,
+      "interChunk": 0,
+      "intraChunk": 0,
+    },
+    "0,0,1": {
+      "global": 4,
+      "interChunk": 0,
+      "intraChunk": 4,
+    },
+    "0,1,0": {
+      "global": 1,
+      "interChunk": 0,
+      "intraChunk": 1,
+    },
+    "1,0,0": {
+      "global": 2,
+      "interChunk": 0,
+      "intraChunk": 2,
+    },
+    "1,1,1": {
+      "global": 7,
+      "interChunk": 0,
+      "intraChunk": 7,
+    },
+    "2,2,2": {
+      "global": 56,
+      "interChunk": 7,
+      "intraChunk": 0,
+    },
+    "3,3,3": {
+      "global": 63,
+      "interChunk": 7,
+      "intraChunk": 7,
+    },
+  },
+  "metrics": {
+    "actualCells": 64,
+    "amplification": 8,
+    "rangeCount": 1,
+    "requestedCells": 8,
+    "totalCells": 64,
+    "touchedChunks": 8,
+  },
+  "ranges": [
+    {
+      "end": 63,
+      "start": 0,
+    },
+  ],
+}
+`;
+
+exports[`Snapshot-Based Regression Tests Algorithm Output Snapshots Hilbert-ZOrder Mixed Algorithm produces consistent output 1`] = `
+{
+  "cellSamples": {
+    "actualSample": [
+      "0,0,0",
+      "0,1,0",
+      "0,2,0",
+      "0,3,0",
+      "0,4,0",
+      "0,5,0",
+      "0,6,0",
+      "0,7,0",
+      "1,0,0",
+      "1,1,0",
+    ],
+    "requestedSample": [
+      "2,2,0",
+      "2,3,0",
+      "2,4,0",
+      "2,5,0",
+      "3,2,0",
+      "3,3,0",
+      "3,4,0",
+      "3,5,0",
+      "4,2,0",
+      "4,3,0",
+    ],
+  },
+  "coordinateMappings": {
+    "0,0,0": {
+      "global": 0,
+      "interChunk": 0,
+      "intraChunk": 0,
+    },
+    "1,1,0": {
+      "global": 2,
+      "interChunk": 0,
+      "intraChunk": 2,
+    },
+    "2,2,0": {
+      "global": 8,
+      "interChunk": 0,
+      "intraChunk": 8,
+    },
+    "3,3,0": {
+      "global": 10,
+      "interChunk": 0,
+      "intraChunk": 10,
+    },
+    "4,4,0": {
+      "global": 48,
+      "interChunk": 3,
+      "intraChunk": 0,
+    },
+    "7,7,0": {
+      "global": 58,
+      "interChunk": 3,
+      "intraChunk": 10,
+    },
+  },
+  "metrics": {
+    "actualCells": 64,
+    "amplification": 4,
+    "rangeCount": 1,
+    "requestedCells": 16,
+    "totalCells": 64,
+    "touchedChunks": 4,
+  },
+  "ranges": [
+    {
+      "end": 63,
+      "start": 0,
+    },
+  ],
+}
+`;
+
+exports[`Snapshot-Based Regression Tests Algorithm Output Snapshots Large Array Representative Sample produces consistent output 1`] = `
+{
+  "cellSamples": {
+    "actualSample": [
+      "10,10,0",
+      "10,11,0",
+      "10,12,0",
+      "10,13,0",
+      "10,14,0",
+      "10,15,0",
+      "10,16,0",
+      "10,17,0",
+      "10,18,0",
+      "10,19,0",
+    ],
+    "requestedSample": [
+      "10,10,0",
+      "10,11,0",
+      "10,12,0",
+      "10,13,0",
+      "10,14,0",
+      "10,15,0",
+      "10,16,0",
+      "10,8,0",
+      "10,9,0",
+      "11,10,0",
+    ],
+  },
+  "coordinateMappings": {
+    "0,0,0": {
+      "global": 0,
+      "interChunk": 0,
+      "intraChunk": 0,
+    },
+    "15,15,0": {
+      "global": 191,
+      "interChunk": 2,
+      "intraChunk": 63,
+    },
+    "16,16,0": {
+      "global": 512,
+      "interChunk": 8,
+      "intraChunk": 0,
+    },
+    "24,24,0": {
+      "global": 640,
+      "interChunk": 10,
+      "intraChunk": 0,
+    },
+    "31,31,0": {
+      "global": 703,
+      "interChunk": 10,
+      "intraChunk": 63,
+    },
+    "7,7,0": {
+      "global": 63,
+      "interChunk": 0,
+      "intraChunk": 63,
+    },
+    "8,8,0": {
+      "global": 128,
+      "interChunk": 2,
+      "intraChunk": 0,
+    },
+  },
+  "metrics": {
+    "actualCells": 256,
+    "amplification": 3.1605,
+    "rangeCount": 3,
+    "requestedCells": 81,
+    "totalCells": 1024,
+    "touchedChunks": 4,
+  },
+  "ranges": [
+    {
+      "end": 191,
+      "start": 128,
+    },
+    {
+      "end": 575,
+      "start": 448,
+    },
+    {
+      "end": 895,
+      "start": 832,
+    },
+  ],
+}
+`;
+
+exports[`Snapshot-Based Regression Tests Cross-Algorithm Comparison Snapshots algorithm performance comparison matrix snapshot 1`] = `
+{
+  "col-major→col-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "col-major→hilbert": {
+    "amplification": 2.56,
+    "coalescing": 1.3333,
+    "efficiency": 39.06,
+    "ranges": 3,
+  },
+  "col-major→row-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "col-major→z-order": {
+    "amplification": 2.56,
+    "coalescing": 1,
+    "efficiency": 39.06,
+    "ranges": 4,
+  },
+  "hilbert→col-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "hilbert→hilbert": {
+    "amplification": 2.56,
+    "coalescing": 1.3333,
+    "efficiency": 39.06,
+    "ranges": 3,
+  },
+  "hilbert→row-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "hilbert→z-order": {
+    "amplification": 2.56,
+    "coalescing": 1,
+    "efficiency": 39.06,
+    "ranges": 4,
+  },
+  "row-major→col-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "row-major→hilbert": {
+    "amplification": 2.56,
+    "coalescing": 1.3333,
+    "efficiency": 39.06,
+    "ranges": 3,
+  },
+  "row-major→row-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "row-major→z-order": {
+    "amplification": 2.56,
+    "coalescing": 1,
+    "efficiency": 39.06,
+    "ranges": 4,
+  },
+  "z-order→col-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "z-order→hilbert": {
+    "amplification": 2.56,
+    "coalescing": 1.3333,
+    "efficiency": 39.06,
+    "ranges": 3,
+  },
+  "z-order→row-major": {
+    "amplification": 2.56,
+    "coalescing": 2,
+    "efficiency": 39.06,
+    "ranges": 2,
+  },
+  "z-order→z-order": {
+    "amplification": 2.56,
+    "coalescing": 1,
+    "efficiency": 39.06,
+    "ranges": 4,
+  },
+}
+`;
+
+exports[`Snapshot-Based Regression Tests Edge Case Snapshots 3D configuration snapshots 1`] = `
+{
+  "coordinateMappings": {
+    "0,0,0": {
+      "global": 0,
+      "interChunk": 0,
+      "intraChunk": 0,
+    },
+    "0,1,2": {
+      "global": 33,
+      "interChunk": 4,
+      "intraChunk": 1,
+    },
+    "1,1,1": {
+      "global": 6,
+      "interChunk": 0,
+      "intraChunk": 6,
+    },
+    "1,2,3": {
+      "global": 55,
+      "interChunk": 6,
+      "intraChunk": 7,
+    },
+    "2,1,0": {
+      "global": 9,
+      "interChunk": 1,
+      "intraChunk": 1,
+    },
+    "2,2,2": {
+      "global": 56,
+      "interChunk": 7,
+      "intraChunk": 0,
+    },
+    "3,3,3": {
+      "global": 62,
+      "interChunk": 7,
+      "intraChunk": 6,
+    },
+  },
+  "metrics": {
+    "actualCells": 64,
+    "amplification": 8,
+    "requestedCells": 8,
+    "totalCells": 64,
+    "touchedChunks": 8,
+  },
+}
+`;
+
+exports[`Snapshot-Based Regression Tests Edge Case Snapshots boundary conditions produce consistent results 1`] = `
+{
+  "corner-query": {
+    "actualCells": 16,
+    "amplification": 16,
+    "ranges": [
+      {
+        "end": 15,
+        "start": 0,
+      },
+    ],
+    "requestedCells": 1,
+    "totalCells": 100,
+    "touchedChunks": 1,
+  },
+  "max-coordinate-query": {
+    "actualCells": 4,
+    "amplification": 4,
+    "ranges": [
+      {
+        "end": 123,
+        "start": 120,
+      },
+    ],
+    "requestedCells": 1,
+    "totalCells": 144,
+    "touchedChunks": 1,
+  },
+  "partial-chunk-boundary": {
+    "actualCells": 20,
+    "amplification": 5,
+    "ranges": [
+      {
+        "end": 55,
+        "start": 40,
+      },
+      {
+        "end": 62,
+        "start": 59,
+      },
+    ],
+    "requestedCells": 4,
+    "totalCells": 63,
+    "touchedChunks": 4,
+  },
+  "single-cell-query": {
+    "actualCells": 9,
+    "amplification": 9,
+    "ranges": [
+      {
+        "end": 35,
+        "start": 27,
+      },
+    ],
+    "requestedCells": 1,
+    "totalCells": 64,
+    "touchedChunks": 1,
+  },
+}
+`;

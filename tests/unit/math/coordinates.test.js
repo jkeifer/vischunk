@@ -1,4 +1,4 @@
-import { GridCoordinate } from '../src/js/core/coordinates.js';
+import { GridCoordinate } from '../../../src/js/core/coordinates.js';
 
 describe('GridCoordinate', () => {
     test('row-major linearization works correctly', () => {
