@@ -34,13 +34,16 @@ storage layouts and their impact on read performance.
 ### Real-time Metrics
 
 - **Cells Requesteds**: How many cells are in the query
-- **Cells Read**: How many cells have to be read to fulfill the query (due to chunking)
+- **Cells Read**: How many cells have to be read to fulfill the query (due to
+  chunking)
 - **Read Amplification**: How much extra data needs to be read due to chunking
 - **Read Efficiency**: Percentage of useful data in each read operation
 - **Chunks Touched**: How many chunks intersect with the query region
 - **Range Reads**: Number of separate read operations required
-- **Coalescing Factor**: How much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads)
-- **Storage Alignment**: Overall measure of how well your query aligns with the storage layout, combining read efficiency and coalescing.
+- **Coalescing Factor**: How much read coalescing improves I/O efficiency
+  compared to worst-case (chunks touched ÷ range reads)
+- **Storage Alignment**: Overall measure of how well your query aligns with the
+  storage layout, combining read efficiency and coalescing.
 
 ## 🎮 How to Use
 
@@ -92,49 +95,10 @@ The metrics panel shows the efficiency implications of your choices:
 - **Education**: Teaching concepts of data structures, spatial locality, and
   storage optimization
 
-## 🛠️ Technical Details
-
-- **Pure HTML/CSS/JavaScript**: No external dependencies
-- **Canvas-based Rendering**: Smooth interactive visualizations
-- **Real-time Calculations**: All metrics computed dynamically
-- **Responsive Design**: Works on desktop and mobile devices
-
-## 📝 Algorithms Implemented
-
-### Cell Linearization (Within Chunks)
-
-- **Row-Major**: `index = x + y * width`
-- **Column-Major**: `index = y + x * height`
-- **Z-Order**: Morton encoding with bit interleaving
-- **Hilbert**: Recursive Hilbert curve generation
-
-### Chunk Linearization
-
-- Same algorithms applied at the chunk level
-- Supports nested linearization strategies
-- Calculates global positions combining both levels
-
 ## 🤝 Contributing
 
-To contribute to this project:
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Start development server: `npm run dev`
-4. Make your changes
-5. Run tests: `npm test`
-6. Build for production: `npm run build`
-7. Submit a pull request
-
-## 🚀 Deployment
-
-The site automatically deploys to GitHub Pages when you create a release:
-
-1. Create a new release on GitHub
-2. GitHub Actions will build and deploy automatically
-3. Visit https://jkeifer.github.io/vischunk to see the live site
-
-You can also manually trigger deployment from the Actions tab.
+Interested in contributing? Check out our [CONTRIBUTING.md](CONTRIBUTING.md)
+for detailed development setup, testing guidelines, and contribution workflow.
 
 ## 📄 License
 
