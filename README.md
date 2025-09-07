@@ -116,13 +116,25 @@ The metrics panel shows the efficiency implications of your choices:
 
 ## 🤝 Contributing
 
-This is a single-file HTML application. To contribute:
+To contribute to this project:
 
 1. Clone the repository
-2. Open `index.html` in a web browser
-3. Make your changes
-4. Test the functionality
-5. Submit a pull request
+2. Install dependencies: `npm install`
+3. Start development server: `npm run dev`
+4. Make your changes
+5. Run tests: `npm test`
+6. Build for production: `npm run build`
+7. Submit a pull request
+
+## 🚀 Deployment
+
+The site automatically deploys to GitHub Pages when you create a release:
+
+1. Create a new release on GitHub
+2. GitHub Actions will build and deploy automatically
+3. Visit https://jkeifer.github.io/vischunk to see the live site
+
+You can also manually trigger deployment from the Actions tab.
 
 ## 📄 License
 
