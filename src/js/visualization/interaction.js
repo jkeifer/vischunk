@@ -44,11 +44,31 @@ export class InteractionStrategy {
     showTooltip(e, targetInfo, sticky = false) {
         const params = this.visualizer.getParameters();
         if (targetInfo.cell && targetInfo.usesCellTooltip) {
-            this.tooltipManager.show(e, TooltipContentGenerator.generateCellTooltip(targetInfo.cell, params, this.visualizer), sticky);
+            this.tooltipManager.show(
+                e,
+                TooltipContentGenerator.generateCellTooltip(
+                    targetInfo.cell,
+                    params,
+                    this.visualizer
+                ),
+                sticky
+            );
         } else if (targetInfo.chunk) {
             const [sizeX, sizeY] = params.size;
             const [chunkX, chunkY] = params.chunk;
-            this.tooltipManager.show(e, TooltipContentGenerator.generateChunkTooltip(targetInfo.chunk, params, sizeX, sizeY, chunkX, chunkY, this.visualizer), sticky);
+            this.tooltipManager.show(
+                e,
+                TooltipContentGenerator.generateChunkTooltip(
+                    targetInfo.chunk,
+                    params,
+                    sizeX,
+                    sizeY,
+                    chunkX,
+                    chunkY,
+                    this.visualizer
+                ),
+                sticky
+            );
         }
     }
 
@@ -93,7 +113,7 @@ export class InteractionManager {
             spatialUnchunked: new SpatialUnchunkedStrategy(visualizer, tooltipManager),
             spatialChunked: new SpatialChunkedStrategy(visualizer, tooltipManager),
             linearUnchunked: linearStrategy,
-            linearChunked: linearStrategy
+            linearChunked: linearStrategy,
         };
     }
 
@@ -104,7 +124,9 @@ export class InteractionManager {
         }
 
         // Throttle mouse move updates for performance
-        if (this.mouseThrottle) return;
+        if (this.mouseThrottle) {
+            return;
+        }
         this.mouseThrottle = true;
         requestAnimationFrame(() => {
             this.mouseThrottle = false;
@@ -123,7 +145,9 @@ export class InteractionManager {
         this.tooltipManager.hideIfNotSticky();
 
         // Use requestAnimationFrame for smoother updates
-        if (this.visualizer.updatePending) return;
+        if (this.visualizer.updatePending) {
+            return;
+        }
         this.visualizer.updatePending = true;
         requestAnimationFrame(() => {
             this.visualizer.updatePending = false;
@@ -144,13 +168,26 @@ export class InteractionManager {
 export class SpatialUnchunkedStrategy extends InteractionStrategy {
     getTargetInfo(coords, canvas, _) {
         const params = this.visualizer.getParameters();
-        const { cellX, cellY, isValid } = this.visualizer.coordinateService.getSpatialCellCoordinates(coords.x, coords.y, canvas, params);
+        const { cellX, cellY, isValid } =
+            this.visualizer.coordinateService.getSpatialCellCoordinates(
+                coords.x,
+                coords.y,
+                canvas,
+                params
+            );
 
-        if (!isValid) return null;
+        if (!isValid) {
+            return null;
+        }
 
         const [chunkX, chunkY] = params.chunk;
         const cell = { x: cellX, y: cellY };
-        const chunk = this.visualizer.coordinateService.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
+        const chunk = this.visualizer.coordinateService.getChunkCoordinatesFromCell(
+            cellX,
+            cellY,
+            chunkX,
+            chunkY
+        );
 
         return { cell, chunk, usesCellTooltip: true };
     }
@@ -159,12 +196,25 @@ export class SpatialUnchunkedStrategy extends InteractionStrategy {
 export class SpatialChunkedStrategy extends InteractionStrategy {
     getTargetInfo(coords, canvas, _) {
         const params = this.visualizer.getParameters();
-        const { cellX, cellY, isValid } = this.visualizer.coordinateService.getSpatialCellCoordinates(coords.x, coords.y, canvas, params);
+        const { cellX, cellY, isValid } =
+            this.visualizer.coordinateService.getSpatialCellCoordinates(
+                coords.x,
+                coords.y,
+                canvas,
+                params
+            );
 
-        if (!isValid) return null;
+        if (!isValid) {
+            return null;
+        }
 
         const [chunkX, chunkY] = params.chunk;
-        const chunk = this.visualizer.coordinateService.getChunkCoordinatesFromCell(cellX, cellY, chunkX, chunkY);
+        const chunk = this.visualizer.coordinateService.getChunkCoordinatesFromCell(
+            cellX,
+            cellY,
+            chunkX,
+            chunkY
+        );
 
         return { chunk, usesCellTooltip: false };
     }
@@ -178,17 +228,35 @@ export class SpatialChunkedStrategy extends InteractionStrategy {
 export class LinearStrategy extends InteractionStrategy {
     getTargetInfo(coords, canvas, canvasKey) {
         const data = this.visualizer.currentData;
-        if (!data) return null;
+        if (!data) {
+            return null;
+        }
 
-        const { cellIndex, isValid } = this.visualizer.coordinateService.getLinearCellCoordinates(coords.x, coords.y, canvas, data);
-        if (!isValid) return null;
+        const { cellIndex, isValid } = this.visualizer.coordinateService.getLinearCellCoordinates(
+            coords.x,
+            coords.y,
+            canvas,
+            data
+        );
+        if (!isValid) {
+            return null;
+        }
 
         const params = this.visualizer.getParameters();
         const [sizeX, sizeY] = params.size;
         const [chunkX, chunkY] = params.chunk;
-        const foundCell = this.visualizer.simulationModel.getCellFromLinearIndex(cellIndex, params, sizeX, sizeY, chunkX, chunkY);
+        const foundCell = this.visualizer.simulationModel.getCellFromLinearIndex(
+            cellIndex,
+            params,
+            sizeX,
+            sizeY,
+            chunkX,
+            chunkY
+        );
 
-        if (!foundCell) return null;
+        if (!foundCell) {
+            return null;
+        }
 
         const cell = { x: foundCell.x, y: foundCell.y };
         const chunk = { x: foundCell.chunkX, y: foundCell.chunkY };
@@ -210,11 +278,11 @@ export class LinearStrategy extends InteractionStrategy {
             this.tooltipManager.hide();
             return;
         }
-        
+
         const usesCell = targetInfo.usesCellTooltip;
         const clickedCell = usesCell ? targetInfo.cell : null;
         const clickedChunk = targetInfo.chunk;
-        
+
         if (clickedCell || clickedChunk) {
             // Check if clicking on already selected item to deselect
             if (this.visualizer.selectionState.isSelected(clickedCell, clickedChunk)) {

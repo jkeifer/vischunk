@@ -1,9 +1,9 @@
 import { TooltipManager } from '/src/js/models/selection.js';
-import { 
+import {
     SpatialUnchunkedRenderer,
-    SpatialChunkedRenderer, 
+    SpatialChunkedRenderer,
     LinearUnchunkedRenderer,
-    LinearChunkedRenderer
+    LinearChunkedRenderer,
 } from '/src/js/visualization/renderers.js';
 import { InteractionManager } from '/src/js/visualization/interaction.js';
 import { CONFIG } from '/src/js/core/constants.js';
@@ -22,11 +22,15 @@ export class CanvasManager {
             spatialUnchunked: document.getElementById('spatial-unchunked'),
             spatialChunked: document.getElementById('spatial-chunked'),
             linearUnchunked: document.getElementById('linear-unchunked'),
-            linearChunked: document.getElementById('linear-chunked')
+            linearChunked: document.getElementById('linear-chunked'),
         };
 
         this.tooltipManager = new TooltipManager(document.getElementById('tooltip'));
-        this.interactionManager = new InteractionManager(this.visualizer, this.canvases, this.tooltipManager);
+        this.interactionManager = new InteractionManager(
+            this.visualizer,
+            this.canvases,
+            this.tooltipManager
+        );
 
         this.contexts = {};
         this.renderers = {};
@@ -35,26 +39,52 @@ export class CanvasManager {
             this.contexts[key] = canvas.getContext('2d');
 
             // Create specialized renderers
-            switch(key) {
+            switch (key) {
                 case 'spatialUnchunked':
-                    this.renderers[key] = new SpatialUnchunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
+                    this.renderers[key] = new SpatialUnchunkedRenderer(
+                        canvas,
+                        this.contexts[key],
+                        this.visualizer,
+                        this.visualizer.coordinateService
+                    );
                     break;
                 case 'spatialChunked':
-                    this.renderers[key] = new SpatialChunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
+                    this.renderers[key] = new SpatialChunkedRenderer(
+                        canvas,
+                        this.contexts[key],
+                        this.visualizer,
+                        this.visualizer.coordinateService
+                    );
                     break;
                 case 'linearUnchunked':
-                    this.renderers[key] = new LinearUnchunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
+                    this.renderers[key] = new LinearUnchunkedRenderer(
+                        canvas,
+                        this.contexts[key],
+                        this.visualizer,
+                        this.visualizer.coordinateService
+                    );
                     break;
                 case 'linearChunked':
-                    this.renderers[key] = new LinearChunkedRenderer(canvas, this.contexts[key], this.visualizer, this.visualizer.coordinateService);
+                    this.renderers[key] = new LinearChunkedRenderer(
+                        canvas,
+                        this.contexts[key],
+                        this.visualizer,
+                        this.visualizer.coordinateService
+                    );
                     break;
             }
 
             // Add mouse interaction for spatial and linear views
             if (key.startsWith('spatial') || key.startsWith('linear')) {
-                canvas.addEventListener('mousemove', (e) => this.interactionManager.handleMouseMove(e, key));
-                canvas.addEventListener('mouseleave', () => this.interactionManager.handleMouseLeave());
-                canvas.addEventListener('click', (e) => this.interactionManager.handleMouseClick(e, key));
+                canvas.addEventListener('mousemove', e =>
+                    this.interactionManager.handleMouseMove(e, key)
+                );
+                canvas.addEventListener('mouseleave', () =>
+                    this.interactionManager.handleMouseLeave()
+                );
+                canvas.addEventListener('click', e =>
+                    this.interactionManager.handleMouseClick(e, key)
+                );
             }
         }
 
@@ -74,7 +104,9 @@ export class CanvasManager {
         let resizeRAF = null;
 
         const handleResize = () => {
-            if (resizeRAF) return; // Prevent multiple concurrent updates
+            if (resizeRAF) {
+                return;
+            } // Prevent multiple concurrent updates
 
             resizeRAF = requestAnimationFrame(() => {
                 const needsUpdate = this.resizeCanvases();
@@ -91,13 +123,17 @@ export class CanvasManager {
 
     setupGlobalClickHandler() {
         // Clear selection when clicking outside visualizations
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', e => {
             // Check if click was inside any canvas
             let clickedCanvas = false;
             for (const canvas of Object.values(this.canvases)) {
                 const rect = canvas.getBoundingClientRect();
-                if (e.clientX >= rect.left && e.clientX <= rect.right &&
-                    e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                if (
+                    e.clientX >= rect.left &&
+                    e.clientX <= rect.right &&
+                    e.clientY >= rect.top &&
+                    e.clientY <= rect.bottom
+                ) {
                     clickedCanvas = true;
                     break;
                 }
@@ -169,7 +205,10 @@ export class CanvasManager {
             const height = 120;
             const lastSize = this.lastCanvasSize.get(key);
 
-            if (width > 0 && (!lastSize || lastSize.width !== width || lastSize.height !== height)) {
+            if (
+                width > 0 &&
+                (!lastSize || lastSize.width !== width || lastSize.height !== height)
+            ) {
                 this.setCanvasSize(key, width, height);
                 this.lastCanvasSize.set(key, { width, height });
                 needsUpdate = true;

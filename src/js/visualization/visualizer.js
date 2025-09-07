@@ -21,7 +21,6 @@ export class DataVisualizer {
         this.update();
     }
 
-
     setState(newState) {
         this.settingsManager.setState(newState);
     }
@@ -36,7 +35,9 @@ export class DataVisualizer {
 
     clearCaches() {
         this.colorCache.clear();
-        if (this.coordinateService) this.coordinateService.clearCache();
+        if (this.coordinateService) {
+            this.coordinateService.clearCache();
+        }
         // simulationModel caches are not cleared here, they have their own lifecycle
     }
 
@@ -52,10 +53,25 @@ export class DataVisualizer {
 
     initializeControls() {
         this.populatePresetOptions();
-        const controls = ['cellAlgorithm', 'chunkAlgorithm', 'sizeX', 'sizeY', 'sizeZ', 'chunkX', 'chunkY', 'chunkZ', 'queryX1', 'queryX2', 'queryY1', 'queryY2', 'queryZ1', 'queryZ2'];
+        const controls = [
+            'cellAlgorithm',
+            'chunkAlgorithm',
+            'sizeX',
+            'sizeY',
+            'sizeZ',
+            'chunkX',
+            'chunkY',
+            'chunkZ',
+            'queryX1',
+            'queryX2',
+            'queryY1',
+            'queryY2',
+            'queryZ1',
+            'queryZ2',
+        ];
         controls.forEach(id => {
             const element = document.getElementById(id);
-            element.addEventListener('change', (e) => {
+            element.addEventListener('change', e => {
                 let value = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value;
                 if (e.target.type === 'number') {
                     if (isNaN(value)) {
@@ -67,8 +83,12 @@ export class DataVisualizer {
                         } else {
                             value = Math.max(0, value);
                         }
-                        if (id.startsWith('size')) value = Math.min(value, 256);
-                        if (id === 'sizeZ') value = Math.min(value, 16);
+                        if (id.startsWith('size')) {
+                            value = Math.min(value, 256);
+                        }
+                        if (id === 'sizeZ') {
+                            value = Math.min(value, 16);
+                        }
                     }
                 }
                 this.setState({ [id]: value });
@@ -77,7 +97,7 @@ export class DataVisualizer {
             });
         });
 
-        document.getElementById('presets').addEventListener('change', (e) => {
+        document.getElementById('presets').addEventListener('change', e => {
             this.settingsManager.loadPreset(e.target.value);
             this.updateUI();
             this.settingsManager.saveSettings();
@@ -126,15 +146,17 @@ export class DataVisualizer {
             query: {
                 x: [state.queryX1, state.queryX2],
                 y: [state.queryY1, state.queryY2],
-                z: [state.queryZ1, state.queryZ2]
-            }
+                z: [state.queryZ1, state.queryZ2],
+            },
         };
     }
 
     getColorForLinearPosition(position, maxPosition) {
         const key = `${position}-${maxPosition}`;
         const cachedColor = this.colorCache.get(key);
-        if (cachedColor) return cachedColor;
+        if (cachedColor) {
+            return cachedColor;
+        }
         const hue = 120 - (position / maxPosition) * 120;
         const color = `hsl(${hue}, 70%, 50%)`;
         this.colorCache.set(key, color);
@@ -159,42 +181,22 @@ export class DataVisualizer {
     }
 
     updateMetrics(data) {
-        const amplification = data.actualCells.size / Math.max(
-            1,
-            data.requestedCells.size,
-        );
-        const coalescingFactor = data.touchedChunks.size / Math.max(
-            1,
-            data.chunkedRanges.length,
-        );
+        const amplification = data.actualCells.size / Math.max(1, data.requestedCells.size);
+        const coalescingFactor = data.touchedChunks.size / Math.max(1, data.chunkedRanges.length);
         const amplificationScore = 1 / Math.max(1, amplification);
         const rangeScore = 1 / Math.max(1, data.chunkedRanges.length);
-        const storageAlignment =
-            (.9 * amplificationScore) + (.1 * rangeScore);
+        const storageAlignment = 0.9 * amplificationScore + 0.1 * rangeScore;
 
-        document.getElementById(
-            'requested-cells'
-        ).textContent = data.requestedCells.size;
-        document.getElementById(
-            'actual-cells'
-        ).textContent = data.actualCells.size;
-        document.getElementById(
-            'amplification'
-        ).innerHTML = amplification.toFixed(2) + '<span class="metric-suffix">x</span>';
-        document.getElementById(
-            'chunks-touched'
-        ).textContent = data.touchedChunks.size;
-        document.getElementById(
-            'byte-ranges'
-        ).textContent = data.chunkedRanges.length;
-        document.getElementById(
-            'efficiency'
-        ).innerHTML = (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
-        document.getElementById(
-            'coalescing-factor'
-        ).innerHTML = coalescingFactor.toFixed(1) + '<span class="metric-suffix">x</span>';
-        document.getElementById(
-            'storage-alignment'
-        ).textContent = storageAlignment.toFixed(2);
+        document.getElementById('requested-cells').textContent = data.requestedCells.size;
+        document.getElementById('actual-cells').textContent = data.actualCells.size;
+        document.getElementById('amplification').innerHTML =
+            amplification.toFixed(2) + '<span class="metric-suffix">x</span>';
+        document.getElementById('chunks-touched').textContent = data.touchedChunks.size;
+        document.getElementById('byte-ranges').textContent = data.chunkedRanges.length;
+        document.getElementById('efficiency').innerHTML =
+            (100 / amplification).toFixed(1) + '<span class="metric-suffix">%</span>';
+        document.getElementById('coalescing-factor').innerHTML =
+            coalescingFactor.toFixed(1) + '<span class="metric-suffix">x</span>';
+        document.getElementById('storage-alignment').textContent = storageAlignment.toFixed(2);
     }
 }

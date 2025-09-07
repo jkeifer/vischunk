@@ -46,10 +46,16 @@ export class SelectionState {
     }
 
     isSelected(cell, chunk) {
-        const sameCell = cell && this.selectedCell &&
-            cell.x === this.selectedCell.x && cell.y === this.selectedCell.y;
-        const sameChunk = chunk && this.selectedChunk &&
-            chunk.x === this.selectedChunk.x && chunk.y === this.selectedChunk.y;
+        const sameCell =
+            cell &&
+            this.selectedCell &&
+            cell.x === this.selectedCell.x &&
+            cell.y === this.selectedCell.y;
+        const sameChunk =
+            chunk &&
+            this.selectedChunk &&
+            chunk.x === this.selectedChunk.x &&
+            chunk.y === this.selectedChunk.y;
         return sameCell || sameChunk;
     }
 
@@ -100,7 +106,12 @@ export class TooltipManager {
 
 export class TooltipContentGenerator {
     static generateCellTooltip(cell, params, visualizer) {
-        const intraChunkPos = visualizer.simulationModel.getIntraChunkPosition(cell.x, cell.y, 0, params);
+        const intraChunkPos = visualizer.simulationModel.getIntraChunkPosition(
+            cell.x,
+            cell.y,
+            0,
+            params
+        );
         const globalPos = visualizer.simulationModel.getGlobalPosition(cell.x, cell.y, 0, params);
         return `Cell (${cell.x}, ${cell.y}) → Intra-chunk: ${intraChunkPos}, Global: ${globalPos}`;
     }
@@ -108,8 +119,20 @@ export class TooltipContentGenerator {
     static generateChunkTooltip(chunk, params, sizeX, sizeY, chunkX, chunkY, visualizer) {
         const chunksX = Math.ceil(sizeX / chunkX);
         const chunkIdx = chunk.x + chunk.y * chunksX;
-        const bounds = visualizer.simulationModel.getChunkBounds(chunk.x, chunk.y, chunkX, chunkY, sizeX, sizeY);
-        const interChunkPos = visualizer.simulationModel.getInterChunkPosition(bounds.startX, bounds.startY, 0, params);
+        const bounds = visualizer.simulationModel.getChunkBounds(
+            chunk.x,
+            chunk.y,
+            chunkX,
+            chunkY,
+            sizeX,
+            sizeY
+        );
+        const interChunkPos = visualizer.simulationModel.getInterChunkPosition(
+            bounds.startX,
+            bounds.startY,
+            0,
+            params
+        );
         return `Chunk ${chunkIdx}: cells (${bounds.startX},${bounds.startY}) to (${bounds.endX - 1},${bounds.endY - 1}), Linear pos: ${interChunkPos}`;
     }
 }

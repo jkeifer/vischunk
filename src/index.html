@@ -1,339 +1,455 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multidimensional Data Linearization</title>
-</head>
-<body>
-    <div class="content-wrapper container">
-        <div class="overview-container">
-            <h1>vischunk</h1>
-            <h2>An nd-Array Chunking and Linearization Analyzer</h2>
-            <p class="subtitle">
-                Explore how chunking and linearization strategies affect the
-                efficiency of various read patterns
-            </p>
-
-            <div class="overview-content">
-                <h2>What is chunking and linearization?</h2>
-                <p>
-                    When working with n-dimensional datasets in cloud storage,
-                    we face a fundamental challenge: n-dimensional data must be
-                    <strong>linearized</strong> into one dimension for storage
-                    and transfer. Linearization creates an inconsistency
-                    between how we conceptualize our data and how it's
-                    physically stored.
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Multidimensional Data Linearization</title>
+    </head>
+    <body>
+        <div class="content-wrapper container">
+            <div class="overview-container">
+                <h1>vischunk</h1>
+                <h2>An nd-Array Chunking and Linearization Analyzer</h2>
+                <p class="subtitle">
+                    Explore how chunking and linearization strategies affect the efficiency of
+                    various read patterns
                 </p>
-                <p>
-                    <strong>Chunking</strong> divides large datasets into
-                    smaller blocks that serve as both the unit of compression
-                    and the minimum unit for reading. Especially in systems
-                    where data is read over a network, such as when
-                    cloud-native data is hosted in an object store like S3,
-                    chunk design critically impacts performance. Too small, and
-                    you may have to wait because of the latency assoicated with
-                    the overhead of excessive reads requests. Too large, and
-                    you may have to wait to download excessive amounts of
-                    unwanted data.
-                </p>
-                <p>
-                    This tool demonstrates how different chunking and
-                    linearization strategies affect read efficiency. Watch how
-                    query patterns interact with chunk boundaries to create
-                    <strong>read amplification</strong> (the ratio of data
-                    requested to how much data is actually read and
-                    transmitted). Notice that smaller chunks decrease read
-                    amplification, but can increase request count. See how
-                    different linearization algorithms (row-major,
-                    column-major, Z-order, Hilbert) change the preservation of
-                    spatial locality after linearization, and what effects that
-                    may have on read coalescing.
-                </p>
-                <p>To learn more about the complexities of chunking and how it has
-                   come to be such a concern, checkout these blog posts:
-                    <a href="https://teotl.dev/posts/2025/07/09/chunks-and-chunkability-tyranny-of-the-chunk/" target="_blank">The Tyranny of the Chunk</a> |
-                    <a href="https://teotl.dev/posts/2025/07/09/chunks-and-chunkability-an-origin-story/" target="_blank">An Origin Story</a>
-                </p>
+
+                <div class="overview-content">
+                    <h2>What is chunking and linearization?</h2>
+                    <p>
+                        When working with n-dimensional datasets in cloud storage, we face a
+                        fundamental challenge: n-dimensional data must be
+                        <strong>linearized</strong> into one dimension for storage and transfer.
+                        Linearization creates an inconsistency between how we conceptualize our data
+                        and how it's physically stored.
+                    </p>
+                    <p>
+                        <strong>Chunking</strong> divides large datasets into smaller blocks that
+                        serve as both the unit of compression and the minimum unit for reading.
+                        Especially in systems where data is read over a network, such as when
+                        cloud-native data is hosted in an object store like S3, chunk design
+                        critically impacts performance. Too small, and you may have to wait because
+                        of the latency associated with the overhead of excessive reads requests. Too
+                        large, and you may have to wait to download excessive amounts of unwanted
+                        data.
+                    </p>
+                    <p>
+                        This tool demonstrates how different chunking and linearization strategies
+                        affect read efficiency. Watch how query patterns interact with chunk
+                        boundaries to create
+                        <strong>read amplification</strong> (the ratio of data requested to how much
+                        data is actually read and transmitted). Notice that smaller chunks decrease
+                        read amplification, but can increase request count. See how different
+                        linearization algorithms (row-major, column-major, Z-order, Hilbert) change
+                        the preservation of spatial locality after linearization, and what effects
+                        that may have on read coalescing.
+                    </p>
+                    <p>
+                        To learn more about the complexities of chunking and how it has come to be
+                        such a concern, checkout these blog posts:
+                        <a
+                            href="https://teotl.dev/posts/2025/07/09/chunks-and-chunkability-tyranny-of-the-chunk/"
+                            target="_blank"
+                            >The Tyranny of the Chunk</a
+                        >
+                        |
+                        <a
+                            href="https://teotl.dev/posts/2025/07/09/chunks-and-chunkability-an-origin-story/"
+                            target="_blank"
+                            >An Origin Story</a
+                        >
+                    </p>
+                </div>
+                <div class="github-link-container">
+                    <a
+                        href="https://github.com/jkeifer/vischunk"
+                        target="_blank"
+                        class="github-link"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path
+                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                            ></path>
+                        </svg>
+                        view or contribute to this project on github
+                    </a>
+                </div>
             </div>
-            <div class="github-link-container">
-                <a href="https://github.com/jkeifer/vischunk" target="_blank" class="github-link">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                    </svg>
-                    view or contribute to this project on github
-                </a>
-            </div>
-        </div>
 
-        <div class="content-wrapper simulation-wrapper">
-            <h2>Interactive Simulation</h2>
+            <div class="content-wrapper simulation-wrapper">
+                <h2>Interactive Simulation</h2>
 
-            <div class="section-container">
-                <h2>Simulation Controls</h2>
+                <div class="section-container">
+                    <h2>Simulation Controls</h2>
 
-                <div class="preset-controls">
-                    <div class="control-group">
-                        <label for="presets">Scenario Presets</label>
-                        <select id="presets">
-                            <option value="user">User Settings</option>
-                        </select>
+                    <div class="preset-controls">
+                        <div class="control-group">
+                            <label for="presets">Scenario Presets</label>
+                            <select id="presets">
+                                <option value="user">User Settings</option>
+                            </select>
+                        </div>
+                        <button class="reset-button" id="resetButton">reset to default</button>
                     </div>
-                    <button class="reset-button" id="resetButton">reset to default</button>
-                </div>
 
-            <div class="controls">
-                <div class="control-section">
-                <div class="section-title">Array Settings</div>
-                <div class="control-group">
-                    <label for="sizeX">Array Size X</label>
-                    <input type="number" id="sizeX" min="1" max="256" value="16">
-                </div>
+                    <div class="controls">
+                        <div class="control-section">
+                            <div class="section-title">Array Settings</div>
+                            <div class="control-group">
+                                <label for="sizeX">Array Size X</label>
+                                <input type="number" id="sizeX" min="1" max="256" value="16" />
+                            </div>
 
-                <div class="control-group">
-                    <label for="sizeY">Array Size Y</label>
-                    <input type="number" id="sizeY" min="1" max="256" value="16">
-                </div>
+                            <div class="control-group">
+                                <label for="sizeY">Array Size Y</label>
+                                <input type="number" id="sizeY" min="1" max="256" value="16" />
+                            </div>
 
-                <div class="control-group z-control" id="arraySizeZGroup">
-                    <label for="sizeZ">Array Size Z</label>
-                    <input type="number" id="sizeZ" min="1" max="16" value="1">
-                </div>
+                            <div class="control-group z-control" id="arraySizeZGroup">
+                                <label for="sizeZ">Array Size Z</label>
+                                <input type="number" id="sizeZ" min="1" max="16" value="1" />
+                            </div>
 
-                <div class="control-group">
-                    <label for="cellAlgorithm">Cell Linearization (within chunk)</label>
-                    <select id="cellAlgorithm">
-                        <option value="row-major">Row-Major</option>
-                        <option value="col-major">Column-Major</option>
-                        <option value="z-order">Z-Order (Morton)</option>
-                        <option value="hilbert">Hilbert Curve</option>
-                    </select>
-                </div>
-            </div>
+                            <div class="control-group">
+                                <label for="cellAlgorithm">Cell Linearization (within chunk)</label>
+                                <select id="cellAlgorithm">
+                                    <option value="row-major">Row-Major</option>
+                                    <option value="col-major">Column-Major</option>
+                                    <option value="z-order">Z-Order (Morton)</option>
+                                    <option value="hilbert">Hilbert Curve</option>
+                                </select>
+                            </div>
+                        </div>
 
-            <div class="control-section">
-                <div class="section-title">Chunk Settings</div>
-                <div class="control-group">
-                    <label for="chunkX">Chunk Size X</label>
-                    <input type="number" id="chunkX" min="1" max="256" value="4">
-                </div>
+                        <div class="control-section">
+                            <div class="section-title">Chunk Settings</div>
+                            <div class="control-group">
+                                <label for="chunkX">Chunk Size X</label>
+                                <input type="number" id="chunkX" min="1" max="256" value="4" />
+                            </div>
 
-                <div class="control-group">
-                    <label for="chunkY">Chunk Size Y</label>
-                    <input type="number" id="chunkY" min="1" max="256" value="4">
-                </div>
+                            <div class="control-group">
+                                <label for="chunkY">Chunk Size Y</label>
+                                <input type="number" id="chunkY" min="1" max="256" value="4" />
+                            </div>
 
-                <div class="control-group z-control" id="chunkZGroup">
-                    <label for="chunkZ">Chunk Size Z</label>
-                    <input type="number" id="chunkZ" min="1" max="16" value="1">
-                </div>
+                            <div class="control-group z-control" id="chunkZGroup">
+                                <label for="chunkZ">Chunk Size Z</label>
+                                <input type="number" id="chunkZ" min="1" max="16" value="1" />
+                            </div>
 
-                <div class="control-group">
-                    <label for="chunkAlgorithm">Chunk Linearization</label>
-                    <select id="chunkAlgorithm">
-                        <option value="row-major">Row-Major</option>
-                        <option value="col-major">Column-Major</option>
-                        <option value="z-order">Z-Order (Morton)</option>
-                        <option value="hilbert">Hilbert Curve</option>
-                    </select>
-                </div>
-            </div>
+                            <div class="control-group">
+                                <label for="chunkAlgorithm">Chunk Linearization</label>
+                                <select id="chunkAlgorithm">
+                                    <option value="row-major">Row-Major</option>
+                                    <option value="col-major">Column-Major</option>
+                                    <option value="z-order">Z-Order (Morton)</option>
+                                    <option value="hilbert">Hilbert Curve</option>
+                                </select>
+                            </div>
+                        </div>
 
-            <div class="control-section">
-                <div class="section-title">Query Region</div>
-                <div class="range-group">
-                    <label for="queryX1">X:</label>
-                    <input type="number" id="queryX1" min="0" value="3">
-                    <span>to</span>
-                    <input type="number" id="queryX2" min="0" value="10">
-                </div>
-                <div class="range-group">
-                    <label for="queryY1">Y:</label>
-                    <input type="number" id="queryY1" min="0" value="3">
-                    <span>to</span>
-                    <input type="number" id="queryY2" min="0" value="10">
-                </div>
-                <div class="range-group z-control" id="zRange">
-                    <label for="queryZ1">Z:</label>
-                    <input type="number" id="queryZ1" min="0" value="0">
-                    <span>to</span>
-                    <input type="number" id="queryZ2" min="0" value="0">
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="section-container">
-        <h2>Performance Metrics</h2>
-        <div class="metrics">
-            <div class="metric">
-                <div class="metric-label">Requested Cells</div>
-                <div class="metric-value" id="requested-cells">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Cells Read</div>
-                <div class="metric-value" id="actual-cells">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Read Amplification</div>
-                <div class="metric-value" id="amplification">1.0<span class="metric-suffix">x</span></div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Read Efficiency</div>
-                <div class="metric-value" id="efficiency">100<span class="metric-suffix">%</span></div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Chunks Touched</div>
-                <div class="metric-value" id="chunks-touched">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Range Reads</div>
-                <div class="metric-value" id="byte-ranges">0</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Coalescing Factor</div>
-                <div class="metric-value" id="coalescing-factor">1.0<span class="metric-suffix">x</span></div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Storage Alignment</div>
-                <div class="metric-value" id="storage-alignment">1.0</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="section-container">
-        <h2>Simulation Visualizations</h2>
-        <div class="spatial-views">
-            <div class="viz-panel">
-                <div class="viz-title">Array Cells</div>
-                <div class="canvas-container">
-                    <canvas id="spatial-unchunked"></canvas>
-                </div>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color gradient-legend"></div>
-                        <span>Linearization Order</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color query-legend"></div>
-                        <span>Query Region</span>
+                        <div class="control-section">
+                            <div class="section-title">Query Region</div>
+                            <div class="range-group">
+                                <label for="queryX1">X:</label>
+                                <input type="number" id="queryX1" min="0" value="3" />
+                                <span>to</span>
+                                <input type="number" id="queryX2" min="0" value="10" />
+                            </div>
+                            <div class="range-group">
+                                <label for="queryY1">Y:</label>
+                                <input type="number" id="queryY1" min="0" value="3" />
+                                <span>to</span>
+                                <input type="number" id="queryY2" min="0" value="10" />
+                            </div>
+                            <div class="range-group z-control" id="zRange">
+                                <label for="queryZ1">Z:</label>
+                                <input type="number" id="queryZ1" min="0" value="0" />
+                                <span>to</span>
+                                <input type="number" id="queryZ2" min="0" value="0" />
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="viz-panel">
-                <div class="viz-title">Array Chunks</div>
-                <div class="canvas-container">
-                    <canvas id="spatial-chunked"></canvas>
-                </div>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color gradient-legend"></div>
-                        <span>Linearization Order</span>
+                <div class="section-container">
+                    <h2>Performance Metrics</h2>
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="metric-label">Requested Cells</div>
+                            <div class="metric-value" id="requested-cells">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Cells Read</div>
+                            <div class="metric-value" id="actual-cells">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Read Amplification</div>
+                            <div class="metric-value" id="amplification">
+                                1.0<span class="metric-suffix">x</span>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Read Efficiency</div>
+                            <div class="metric-value" id="efficiency">
+                                100<span class="metric-suffix">%</span>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Chunks Touched</div>
+                            <div class="metric-value" id="chunks-touched">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Range Reads</div>
+                            <div class="metric-value" id="byte-ranges">0</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Coalescing Factor</div>
+                            <div class="metric-value" id="coalescing-factor">
+                                1.0<span class="metric-suffix">x</span>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Storage Alignment</div>
+                            <div class="metric-value" id="storage-alignment">1.0</div>
+                        </div>
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-color query-legend"></div>
-                        <span>Chunks to Read</span>
+                </div>
+
+                <div class="section-container">
+                    <h2>Simulation Visualizations</h2>
+                    <div class="spatial-views">
+                        <div class="viz-panel">
+                            <div class="viz-title">Array Cells</div>
+                            <div class="canvas-container">
+                                <canvas id="spatial-unchunked"></canvas>
+                            </div>
+                            <div class="legend">
+                                <div class="legend-item">
+                                    <div class="legend-color gradient-legend"></div>
+                                    <span>Linearization Order</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color query-legend"></div>
+                                    <span>Query Region</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="viz-panel">
+                            <div class="viz-title">Array Chunks</div>
+                            <div class="canvas-container">
+                                <canvas id="spatial-chunked"></canvas>
+                            </div>
+                            <div class="legend">
+                                <div class="legend-item">
+                                    <div class="legend-color gradient-legend"></div>
+                                    <span>Linearization Order</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color query-legend"></div>
+                                    <span>Chunks to Read</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="linear-views">
+                        <div class="linear-viz">
+                            <div class="viz-title">Storage Linearization — Cells</div>
+                            <div class="canvas-container">
+                                <canvas id="linear-unchunked"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="linear-viz">
+                            <div class="viz-title">Storage Linearization — Chunks</div>
+                            <div class="canvas-container">
+                                <canvas id="linear-chunked"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="linear-views">
-            <div class="linear-viz">
-                <div class="viz-title">Storage Linearization — Cells</div>
-                <div class="canvas-container">
-                    <canvas id="linear-unchunked"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+
+        <div class="content-wrapper explanation">
+            <h2>How to Interpret the Visualizations</h2>
+
+            <div class="explanation-content">
+                <div class="explanation-section">
+                    <h3>Color Coding</h3>
+                    <p>
+                        <span class="color-example gradient-legend"></span
+                        ><strong>Green to Red Gradient:</strong> Shows the linearization order from
+                        first (green) to last (red) in memory. This helps you understand how
+                        different algorithms arrange data sequentially.
+                    </p>
+
+                    <p>
+                        <span class="color-example query-legend"></span
+                        ><strong>Blue Outlines:</strong> Indicate query regions and all cells that
+                        need to be read to satisfy the query. This includes both requested cells and
+                        extra cells read due to chunking.
+                    </p>
+
+                    <p>
+                        <span class="color-example highlight-legend"></span
+                        ><strong>White Overlays:</strong> Show currently hovered elements. Direct
+                        hovers have both overlay and outline, while cross-highlighted elements show
+                        only the overlay.
+                    </p>
+                </div>
+
+                <div class="explanation-section">
+                    <h3>Array Views</h3>
+                    <p>
+                        <strong>Array Cells:</strong> Shows how individual cells are organized and
+                        linearized within chunks. Each cell's color represents its position in the
+                        combined linearization order.
+                    </p>
+
+                    <p>
+                        <strong>Array Chunks:</strong> Displays chunk-level organization where all
+                        cells in the same chunk share the same color. This shows how chunks are
+                        linearized relative to each other.
+                    </p>
+
+                    <p>
+                        <strong>Interactive Cross-highlighting:</strong> Hovering in one view
+                        highlights corresponding elements in all other views, helping you trace
+                        relationships between logical and physical layouts.
+                    </p>
+                </div>
+
+                <div class="explanation-section">
+                    <h3>Linear Storage Views</h3>
+                    <p>
+                        <strong>Storage Linearization — Cells</strong> Shows how data is actually
+                        stored in linear memory, with the same cell-level coloring as the logical
+                        array. Blue regions indicate cells that need to be read.
+                    </p>
+
+                    <p>
+                        <strong>Storage Linearization — Chunks</strong> Same linear layout but
+                        colored by chunks to show how chunking affects the distribution of read
+                        operations. Blue bars below show the byte ranges that need to be fetched.
+                    </p>
+
+                    <p>
+                        <strong>Byte Range Indicators:</strong> Lines below each linear view show
+                        how many separate read operations are required - fewer ranges mean better
+                        I/O performance.
+                    </p>
+                </div>
+
+                <div class="explanation-section">
+                    <h3>Performance Metrics</h3>
+                    <p>
+                        <strong>Requested Cells:</strong> The number of cells in your query region
+                        that you actually want to read.
+                    </p>
+
+                    <p>
+                        <strong>Actual Cells Read:</strong> The total number of cells that must be
+                        read due to chunking, including both requested and extra cells.
+                    </p>
+
+                    <p>
+                        <strong>Read Amplification:</strong> Shows how much extra data you read due
+                        to chunking. Values > 1.0 indicate wasted bandwidth. Lower is better.
+                    </p>
+
+                    <p>
+                        <strong>Read Efficiency:</strong> Percentage of useful data in each read
+                        operation. Higher percentages indicate better performance with less wasted
+                        I/O.
+                    </p>
+
+                    <p>
+                        <strong>Chunks Touched:</strong> How many chunks intersect with your query
+                        region. Fewer chunks generally mean more efficient access patterns.
+                    </p>
+
+                    <p>
+                        <strong>Range Reads:</strong> Number of separate read operations needed.
+                        Fewer range reads reduce I/O overhead and improve performance.
+                    </p>
+
+                    <p>
+                        <strong>Coalescing Factor:</strong> Shows how much read coalescing improves
+                        I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values
+                        > 1.0 indicate that multiple chunks are being read in fewer operations due
+                        to spatial locality. Note that this does not apply to formats that split
+                        chunks into individual files, like unsharded Zarr, where each chunk has to
+                        be read via a separate read request.
+                    </p>
+
+                    <p>
+                        <strong>Storage Alignment:</strong> Overall measure of how well your query
+                        aligns with the storage layout, combining read amplification and coalescing
+                        in a weighted normalized average in the range 0 - 1. Higher values indicate
+                        better alignment between your access pattern and chunking strategy.
+                    </p>
+                </div>
+
+                <div class="explanation-section">
+                    <h3>Algorithm Comparison</h3>
+                    <p>
+                        <strong>Row-Major:</strong> Best for queries that access consecutive rows.
+                        Common in C/C++ and most programming languages.
+                    </p>
+
+                    <p>
+                        <strong>Column-Major:</strong> Optimal for column-wise access patterns. Used
+                        in Fortran, R, and some scientific computing applications.
+                    </p>
+
+                    <p>
+                        <strong>Z-Order (Morton):</strong> Space-filling curve that preserves
+                        spatial locality well. Good for 2D range queries and spatial databases.
+                    </p>
+
+                    <p>
+                        <strong>Hilbert Curve:</strong> Optimal space-filling curve with the best
+                        spatial locality preservation. Excellent for 2D spatial queries but more
+                        complex to compute.
+                    </p>
+                </div>
+
+                <div class="explanation-section">
+                    <h3>Optimization Tips</h3>
+                    <p>
+                        <strong>Match Access Patterns:</strong> Choose linearization algorithms that
+                        align with how your application accesses data most frequently.
+                    </p>
+
+                    <p>
+                        <strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead
+                        and number of reads, but increase read amplification. Smaller chunks
+                        decrease read amplification but increase read count and can have a
+                        management overhead penalty.
+                    </p>
+
+                    <p>
+                        <strong>Query Shape Matters:</strong> Square queries often work best with
+                        space-filling curves, while rectangular queries favor row- or column-major
+                        ordering, per the rectangle orientation.
+                    </p>
+
+                    <p>
+                        <strong>Monitor Metrics:</strong> Use the metrics to compare different
+                        configurations and find the optimal balance for your specific use cases and
+                        data geometries.
+                    </p>
                 </div>
             </div>
-
-            <div class="linear-viz">
-                <div class="viz-title">Storage Linearization — Chunks</div>
-                <div class="canvas-container">
-                    <canvas id="linear-chunked"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
         </div>
 
-    <div class="tooltip" id="tooltip"></div>
-
-    <div class="content-wrapper explanation">
-        <h2>How to Interpret the Visualizations</h2>
-
-        <div class="explanation-content">
-            <div class="explanation-section">
-                <h3>Color Coding</h3>
-                <p><span class="color-example gradient-legend"></span><strong>Green to Red Gradient:</strong> Shows the linearization order from first (green) to last (red) in memory. This helps you understand how different algorithms arrange data sequentially.</p>
-
-                <p><span class="color-example query-legend"></span><strong>Blue Outlines:</strong> Indicate query regions and all cells that need to be read to satisfy the query. This includes both requested cells and extra cells read due to chunking.</p>
-
-                <p><span class="color-example highlight-legend"></span><strong>White Overlays:</strong> Show currently hovered elements. Direct hovers have both overlay and outline, while cross-highlighted elements show only the overlay.</p>
-            </div>
-
-            <div class="explanation-section">
-                <h3>Array Views</h3>
-                <p><strong>Array Cells:</strong> Shows how individual cells are organized and linearized within chunks. Each cell's color represents its position in the combined linearization order.</p>
-
-                <p><strong>Array Chunks:</strong> Displays chunk-level organization where all cells in the same chunk share the same color. This shows how chunks are linearized relative to each other.</p>
-
-                <p><strong>Interactive Cross-highlighting:</strong> Hovering in one view highlights corresponding elements in all other views, helping you trace relationships between logical and physical layouts.</p>
-            </div>
-
-            <div class="explanation-section">
-                <h3>Linear Storage Views</h3>
-                <p><strong>Storage Linearization — Cells</strong> Shows how data is actually stored in linear memory, with the same cell-level coloring as the logical array. Blue regions indicate cells that need to be read.</p>
-
-                <p><strong>Storage Linearization — Chunks</strong> Same linear layout but colored by chunks to show how chunking affects the distribution of read operations. Blue bars below show the byte ranges that need to be fetched.</p>
-
-                <p><strong>Byte Range Indicators:</strong> Lines below each linear view show how many separate read operations are required - fewer ranges mean better I/O performance.</p>
-            </div>
-
-            <div class="explanation-section">
-                <h3>Performance Metrics</h3>
-                <p><strong>Requested Cells:</strong> The number of cells in your query region that you actually want to read.</p>
-
-                <p><strong>Actual Cells Read:</strong> The total number of cells that must be read due to chunking, including both requested and extra cells.</p>
-
-                <p><strong>Read Amplification:</strong> Shows how much extra data you read due to chunking. Values > 1.0 indicate wasted bandwidth. Lower is better.</p>
-
-                <p><strong>Read Efficiency:</strong> Percentage of useful data in each read operation. Higher percentages indicate better performance with less wasted I/O.</p>
-
-                <p><strong>Chunks Touched:</strong> How many chunks intersect with your query region. Fewer chunks generally mean more efficient access patterns.</p>
-
-                <p><strong>Range Reads:</strong> Number of separate read operations needed. Fewer range reads reduce I/O overhead and improve performance.</p>
-
-                <p><strong>Coalescing Factor:</strong> Shows how much read coalescing improves I/O efficiency compared to worst-case (chunks touched ÷ range reads). Values > 1.0 indicate that multiple chunks are being read in fewer operations due to spatial locality. Note that this does not apply to formats that split chunks into individual files, like unsharded Zarr, where each chunk has to be read via a separate read request.</p>
-
-                <p><strong>Storage Alignment:</strong> Overall measure of how well your query aligns with the storage layout, combining read amplification and coalescing in a weighted normalized average in the range 0 - 1. Higher values indicate better alignment between your access pattern and chunking strategy.</p>
-            </div>
-
-            <div class="explanation-section">
-                <h3>Algorithm Comparison</h3>
-                <p><strong>Row-Major:</strong> Best for queries that access consecutive rows. Common in C/C++ and most programming languages.</p>
-
-                <p><strong>Column-Major:</strong> Optimal for column-wise access patterns. Used in Fortran, R, and some scientific computing applications.</p>
-
-                <p><strong>Z-Order (Morton):</strong> Space-filling curve that preserves spatial locality well. Good for 2D range queries and spatial databases.</p>
-
-                <p><strong>Hilbert Curve:</strong> Optimal space-filling curve with the best spatial locality preservation. Excellent for 2D spatial queries but more complex to compute.</p>
-            </div>
-
-            <div class="explanation-section">
-                <h3>Optimization Tips</h3>
-                <p><strong>Match Access Patterns:</strong> Choose linearization algorithms that align with how your application accesses data most frequently.</p>
-
-                <p><strong>Chunk Size Balance:</strong> Larger chunks reduce metadata overhead and number of reads, but increase read amplification. Smaller chunks decrease read amplification but increase read count and can have a management overhead penalty.</p>
-
-                <p><strong>Query Shape Matters:</strong> Square queries often work best with space-filling curves, while rectangular queries favor row- or column-major ordering, per the rectangle orientation.</p>
-
-                <p><strong>Monitor Metrics:</strong> Use the metrics to compare different configurations and find the optimal balance for your specific use cases and data geometries.</p>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="js/main.js"></script>
-</body>
+        <script type="module" src="js/main.js"></script>
+    </body>
 </html>
